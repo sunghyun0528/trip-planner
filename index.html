@@ -478,10 +478,10 @@
       <input type="email" class="input" id="auth-email" placeholder="you@example.com" autocomplete="email" />
     </div>
 
-    <button class="btn btn-primary btn-block" id="btn-magic">매직 링크 받기</button>
+    <button class="btn btn-primary btn-block" id="btn-magic">인증 메일 받기</button>
 
-    <p style="font-size: 12px; color: var(--mute); margin: 16px 0 0; text-align: center;">
-      이메일로 로그인 링크가 전송됩니다
+    <p style="font-size: 12px; color: var(--mute); margin: 16px 0 0; text-align: center;" id="auth-hint">
+      이메일로 인증 링크가 전송됩니다
     </p>
   </div>
 </div>
@@ -724,6 +724,33 @@ async function bootstrap() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     user = session.user;
+
+    // 이 기기가 "인증 중계" 목적으로 돌아온 경우: 세션을 메일 보낸 기기로 전송
+    const relayEmail = new URLSearchParams(location.search).get('relay');
+    if (relayEmail) {
+      const chanName = await relayChannelName(relayEmail);
+      const ch = sb.channel(chanName);
+      await new Promise(resolve => {
+        ch.subscribe(async status => {
+          if (status === 'SUBSCRIBED') {
+            await ch.send({
+              type: 'broadcast',
+              event: 'session',
+              payload: {
+                access_token: session.access_token,
+                refresh_token: session.refresh_token
+              }
+            });
+            resolve();
+          }
+        });
+      });
+      await sb.removeChannel(ch);
+      // 중계 끝났으면 이 기기도 그대로 로그인 상태로 진입 (URL 정리)
+      history.replaceState({}, '', location.pathname);
+      showRelayDone();
+    }
+
     await processPendingInvite();
     await loadTrips();
     showScreen('screen-trips');
@@ -733,6 +760,10 @@ async function bootstrap() {
     if (code) localStorage.setItem('pending_join', code);
     showScreen('screen-auth');
   }
+}
+
+function showRelayDone() {
+  toast('다른 기기에서도 로그인되었습니다', 3000);
 }
 
 async function processPendingInvite() {
@@ -748,6 +779,17 @@ async function processPendingInvite() {
   if (fromUrl) history.replaceState({}, '', location.pathname);
 }
 
+/* 이메일 기반 채널 키 생성 (본인 기기끼리만 토큰 주고받도록)
+   이메일 + 고정 솔트를 해시 → 추측 불가능한 채널명 */
+async function relayChannelName(email) {
+  const raw = email.trim().toLowerCase() + '::yeoro-relay-v1';
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return 'relay-' + hex.slice(0, 32);
+}
+
+let relayChannelRef = null;
+
 $('#btn-magic').onclick = async () => {
   const email = $('#auth-email').value.trim();
   if (!email) { toast('이메일을 입력하세요'); return; }
@@ -757,12 +799,48 @@ $('#btn-magic').onclick = async () => {
 
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
-  const { error } = await sb.auth.signInWithOtp({ email });
+  // 인증 기기는 이 페이지로 돌아와서 토큰을 중계만 하고 닫힘
+  const redirect = location.origin + location.pathname + '?relay=' + encodeURIComponent(email) + (code ? `&join=${code}` : '');
 
-  btn.disabled = false;
-  btn.textContent = '매직 링크 받기';
-  if (error) toast(error.message);
-  else toast('이메일을 확인하세요');
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirect }
+  });
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = '인증 메일 받기';
+    toast(error.message);
+    return;
+  }
+
+  // 이 기기(메일 보낸 기기)는 인증 완료 신호를 기다림
+  const chanName = await relayChannelName(email);
+  if (relayChannelRef) await sb.removeChannel(relayChannelRef);
+  relayChannelRef = sb.channel(chanName);
+  relayChannelRef
+    .on('broadcast', { event: 'session' }, async ({ payload }) => {
+      if (!payload?.access_token || !payload?.refresh_token) return;
+      const { error: setErr } = await sb.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token
+      });
+      if (setErr) { toast(setErr.message); return; }
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        user = session.user;
+        await sb.removeChannel(relayChannelRef);
+        relayChannelRef = null;
+        await processPendingInvite();
+        await loadTrips();
+        showScreen('screen-trips');
+        toast('로그인되었습니다');
+      }
+    })
+    .subscribe();
+
+  btn.innerHTML = '<span class="loader"></span> 인증 대기 중';
+  $('#auth-hint').textContent = '메일의 링크를 아무 기기에서나 누르면 이 화면이 자동으로 로그인됩니다.';
 };
 
 $('#btn-logout').onclick = async () => {

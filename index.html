@@ -757,12 +757,7 @@ $('#btn-magic').onclick = async () => {
 
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
-  const redirect = location.origin + location.pathname + (code ? `?join=${code}` : '');
-
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: redirect }
-  });
+  const { error } = await sb.auth.signInWithOtp({ email });
 
   btn.disabled = false;
   btn.textContent = '매직 링크 받기';

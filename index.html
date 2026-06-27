@@ -749,6 +749,13 @@ async function handleSignedIn(u) {
   showScreen('screen-trips');
 }
 
+/* 항상 현재 세션의 실제 uid를 반환. 없으면 null. (옛 user 객체 의존 제거) */
+async function currentUid() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) { user = session.user; return session.user.id; }
+  return null;
+}
+
 async function processPendingInvite() {
   const fromUrl = new URLSearchParams(location.search).get('join');
   const fromLS  = localStorage.getItem('pending_join');
@@ -845,8 +852,17 @@ $('#btn-create-trip').onclick = async () => {
   if (!name) { toast('이름을 입력하세요'); return; }
   if (start && end && start > end) { toast('종료일이 시작일보다 빠릅니다'); return; }
 
+  // 옛 user 객체에 의존하지 않고 현재 세션에서 직접 uid 확보
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.user?.id) {
+    toast('세션이 만료되었습니다. 다시 로그인해주세요.');
+    await sb.auth.signOut();
+    return;
+  }
+  user = session.user;
+
   const { data, error } = await sb.from('trips').insert({
-    name, start_date: start, end_date: end, owner_id: user.id
+    name, start_date: start, end_date: end, owner_id: session.user.id
   }).select().single();
 
   if (error) { toast(error.message); return; }
@@ -1026,6 +1042,9 @@ async function savePlace(p) {
   const dup = savedPlaces.find(s => Math.abs(s.lat - p.lat) < 1e-6 && Math.abs(s.lng - p.lng) < 1e-6);
   if (dup) { toast('이미 저장된 장소입니다'); return; }
 
+  const uid = await currentUid();
+  if (!uid) { toast('세션이 만료되었습니다. 다시 로그인해주세요.'); return; }
+
   const { error } = await sb.from('places').insert({
     trip_id: currentTrip.id,
     name: p.name,
@@ -1033,7 +1052,7 @@ async function savePlace(p) {
     lat: p.lat,
     lng: p.lng,
     photo_url: p.photo_url,
-    added_by: user.id
+    added_by: uid
   });
   if (error) { toast(error.message); return; }
   toast(`${p.name} 저장됨`);
@@ -1163,12 +1182,14 @@ function renderItinerary() {
       const placeId = e.dataTransfer.getData('text/place-id');
       if (!placeId) return;
       const existing = itinerary.filter(it => it.date === el.dataset.date);
+      const uid = await currentUid();
+      if (!uid) { toast('세션이 만료되었습니다. 다시 로그인해주세요.'); return; }
       const { error } = await sb.from('itinerary_items').insert({
         trip_id: currentTrip.id,
         place_id: placeId,
         date: el.dataset.date,
         sort_order: existing.length,
-        added_by: user.id
+        added_by: uid
       });
       if (error) toast(error.message);
     });

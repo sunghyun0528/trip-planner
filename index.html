@@ -725,18 +725,28 @@ async function bootstrap() {
     return;
   }
 
+  // Google OAuth 리디렉션 후 URL에 code/token이 붙어 돌아오는 경우
+  // exchangeCodeForSession이 자동으로 처리하고 onAuthStateChange를 발동시킴
+  // 여기서는 이미 세션이 있는 경우(새로고침 등)만 처리
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    user = session.user;
-    await processPendingInvite();
-    await loadTrips();
-    showScreen('screen-trips');
+    await handleSignedIn(session.user);
   } else {
-    // 초대 링크로 들어왔으면 보관
     const code = new URLSearchParams(location.search).get('join');
     if (code) localStorage.setItem('pending_join', code);
     showScreen('screen-auth');
   }
+}
+
+async function handleSignedIn(u) {
+  user = u;
+  // URL 정리 (OAuth 파라미터 제거)
+  if (location.hash || location.search.includes('access_token') || location.search.includes('code=')) {
+    history.replaceState({}, '', location.pathname);
+  }
+  await processPendingInvite();
+  await loadTrips();
+  showScreen('screen-trips');
 }
 
 async function processPendingInvite() {
@@ -777,16 +787,19 @@ $('#btn-google').onclick = async () => {
 };
 
 $('#btn-logout').onclick = async () => {
+  if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (map) { map.remove(); map = null; mapMarkers = []; mapInited = false; }
   await sb.auth.signOut();
-  user = null;
-  currentTrip = null;
-  showScreen('screen-auth');
 };
 
-sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN' && !user) {
-    user = session.user;
-    bootstrap();
+sb.auth.onAuthStateChange(async (event, session) => {
+  if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !user) {
+    await handleSignedIn(session.user);
+  }
+  if (event === 'SIGNED_OUT') {
+    user = null;
+    currentTrip = null;
+    showScreen('screen-auth');
   }
 });
 

@@ -1045,7 +1045,12 @@ function renderSaved() {
   list.querySelectorAll('[data-del]').forEach(b => {
     b.onclick = async (e) => {
       e.stopPropagation();
-      if (confirm('이 장소를 삭제할까?')) await sb.from('places').delete().eq('id', b.dataset.del);
+      if (!confirm('이 장소를 삭제할까?')) return;
+      const id = b.dataset.del;
+      savedPlaces = savedPlaces.filter(p => p.id !== id);
+      renderSaved(); renderMarkers(); renderDashboard();
+      const { error } = await sb.from('places').delete().eq('id', id);
+      if (error) { toast(error.message); await loadSavedPlaces(); renderSaved(); renderMarkers(); }
     };
   });
   list.querySelectorAll('[data-like]').forEach(b => {
@@ -1322,8 +1327,18 @@ function renderItinerary() {
     b.onclick = async (e) => {
       e.stopPropagation();
       if (!confirm('이 일정을 삭제할까?')) return;
-      const { error } = await sb.from('itinerary_items').delete().eq('id', b.dataset.delItin);
-      if (error) toast(error.message);
+      const id = b.dataset.delItin;
+      // 낙관적 업데이트: 로컬 상태에서 먼저 제거 후 즉시 렌더
+      itinerary = itinerary.filter(it => it.id !== id);
+      renderItinerary();
+      renderDashboard();
+      // 백그라운드에서 DB 삭제
+      const { error } = await sb.from('itinerary_items').delete().eq('id', id);
+      if (error) {
+        toast(error.message);
+        // 실패 시 다시 로드
+        await loadItinerary(); renderItinerary(); renderDashboard();
+      }
     };
   });
   wrap.querySelectorAll('[data-move]').forEach(b => {
@@ -1465,8 +1480,11 @@ function renderChecklists() {
     /* X 삭제 */
     xBtn.onclick = async (e) => {
       e.stopPropagation();
-      const { error } = await sb.from('checklists').delete().eq('id', it.id);
-      if (error) toast(error.message);
+      const id = it.id;
+      checklists = checklists.filter(c => c.id !== id);
+      renderChecklists();
+      const { error } = await sb.from('checklists').delete().eq('id', id);
+      if (error) { toast(error.message); await loadChecklists(); renderChecklists(); }
     };
 
     /* 텍스트 인라인 편집 */
@@ -1531,7 +1549,13 @@ function renderLinks() {
       <button class="link-x" data-del-link="${l.id}" title="삭제">×</button>
     </div>`).join('')}</div>`;
   wrap.querySelectorAll('[data-del-link]').forEach(b => {
-    b.onclick = async () => { await sb.from('links').delete().eq('id', b.dataset.delLink); };
+    b.onclick = async () => {
+      const id = b.dataset.delLink;
+      links = links.filter(l => l.id !== id);
+      renderLinks();
+      const { error } = await sb.from('links').delete().eq('id', id);
+      if (error) { toast(error.message); await loadLinks(); renderLinks(); }
+    };
   });
 }
 

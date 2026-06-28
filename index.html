@@ -1366,74 +1366,12 @@ function renderChecklists() {
       </div>`;
   }).join('');
 
-  /* ── 이벤트 위임: document에 한 번만 등록 ── */
-  if (!window._checkDelegated) {
-    window._checkDelegated = true;
+  /* 클릭 이벤트는 아래 GLOBAL EVENT DELEGATION에서 처리 */
 
-    document.addEventListener('click', async (e) => {
-      if (!e.target.closest('#check-grid')) return;
-
-      // 카테고리 접기/펼치기
-      const head = e.target.closest('[data-cat-toggle]');
-      if (head) {
-        if (e.target.closest('[data-seed]') || e.target.closest('[data-add-check]') || e.target.closest('[data-del-check]')) return;
-        const card = head.closest('.check-card');
-        if (card) card.classList.toggle('collapsed');
-        return;
-      }
-
-      // 체크박스
-      const cb = e.target.closest('[data-toggle-check]');
-      if (cb && cb.type === 'checkbox') {
-        const { error } = await sb.from('checklists')
-          .update({ checked: cb.checked }).eq('id', cb.dataset.toggleCheck);
-        if (error) toast(error.message);
-        return;
-      }
-
-      // X 삭제
-      const delBtn = e.target.closest('[data-del-check]');
-      if (delBtn) {
-        const { error } = await sb.from('checklists').delete().eq('id', delBtn.dataset.delCheck);
-        if (error) toast(error.message);
-        return;
-      }
-
-      // 추가
-      const addBtn = e.target.closest('[data-add-check]');
-      if (addBtn) {
-        const cat = addBtn.dataset.addCheck;
-        const uid = await currentUid();
-        if (!uid) { toast('다시 로그인해주세요'); return; }
-        const existing = checklists.filter(c => c.category === cat).length;
-        const { data, error } = await sb.from('checklists').insert({
-          trip_id: currentTrip.id, category: cat, text: '새 항목', sort_order: existing, added_by: uid
-        }).select().single();
-        if (error) { toast(error.message); return; }
-        setTimeout(() => {
-          const el = document.querySelector(`[data-edit-check="${data.id}"]`);
-          if (el) { el.focus(); document.execCommand('selectAll', false, null); }
-        }, 200);
-        return;
-      }
-
-      // 추천 항목 시드
-      const seedBtn = e.target.closest('[data-seed]');
-      if (seedBtn) {
-        const cat = seedBtn.dataset.seed;
-        const uid = await currentUid();
-        if (!uid) return;
-        const rows = SEEDS[cat].map((text, i) => ({
-          trip_id: currentTrip.id, category: cat, text, sort_order: i, added_by: uid
-        }));
-        const { error } = await sb.from('checklists').insert(rows);
-        if (error) toast(error.message); else toast(`${CAT_LABELS[cat].title} 추천 항목 추가됨`);
-      }
-    });
-
-    // 텍스트 편집 — focusin으로 위임
+  /* 텍스트 편집 — focusin으로 위임 (한 번만 등록) */
+  if (!window._checkFocusDelegated) {
+    window._checkFocusDelegated = true;
     document.addEventListener('focusin', (e) => {
-      if (!e.target.closest('#check-grid')) return;
       const el = e.target.closest('[data-edit-check]');
       if (!el) return;
       el.addEventListener('blur', async function onBlur() {
@@ -1442,7 +1380,7 @@ function renderChecklists() {
         const text = el.innerText.trim();
         if (!text) { await sb.from('checklists').delete().eq('id', id); return; }
         await sb.from('checklists').update({ text }).eq('id', id);
-      }, { once: false });
+      });
       el.addEventListener('keydown', function onKey(ev) {
         if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
         if (ev.key === 'Escape') { el.blur(); }
@@ -1593,8 +1531,10 @@ $$('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target ===
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { $$('.modal-bg.active').forEach(m => m.classList.remove('active')); $('#map-overlay').classList.remove('active'); }});
 
 /* ============== GLOBAL EVENT DELEGATION ============== */
-/* Realtime이 innerHTML을 갱신해도 살아남는 위임 핸들러 */
 document.addEventListener('click', async (e) => {
+
+  /* Google 버튼 — onclick이 별도로 있지만 혹시 모를 충돌 방지 */
+  if (e.target.closest('#btn-google')) return;
 
   /* 일정 삭제 × */
   const delItin = e.target.closest('[data-del-itin]');
@@ -1657,6 +1597,64 @@ document.addEventListener('click', async (e) => {
   if (delLink) {
     await sb.from('links').delete().eq('id', delLink.dataset.delLink);
     return;
+  }
+
+  /* ── 체크리스트 ── */
+  if (!e.target.closest('#check-grid')) return;
+
+  /* 카테고리 접기/펼치기 */
+  const catHead = e.target.closest('[data-cat-toggle]');
+  if (catHead) {
+    if (e.target.closest('[data-seed],[data-add-check],[data-del-check],[data-toggle-check]')) return;
+    catHead.closest('.check-card')?.classList.toggle('collapsed');
+    return;
+  }
+
+  /* 체크박스 */
+  const cb = e.target.closest('[data-toggle-check]');
+  if (cb && cb.type === 'checkbox') {
+    const { error } = await sb.from('checklists').update({ checked: cb.checked }).eq('id', cb.dataset.toggleCheck);
+    if (error) toast(error.message);
+    return;
+  }
+
+  /* X 삭제 */
+  const delCheck = e.target.closest('[data-del-check]');
+  if (delCheck) {
+    const { error } = await sb.from('checklists').delete().eq('id', delCheck.dataset.delCheck);
+    if (error) toast(error.message);
+    return;
+  }
+
+  /* + 항목 추가 */
+  const addCheck = e.target.closest('[data-add-check]');
+  if (addCheck) {
+    const cat = addCheck.dataset.addCheck;
+    const uid = await currentUid();
+    if (!uid) { toast('다시 로그인해주세요'); return; }
+    const existing = checklists.filter(c => c.category === cat).length;
+    const { data, error } = await sb.from('checklists').insert({
+      trip_id: currentTrip.id, category: cat, text: '새 항목', sort_order: existing, added_by: uid
+    }).select().single();
+    if (error) { toast(error.message); return; }
+    setTimeout(() => {
+      const el = document.querySelector(`[data-edit-check="${data.id}"]`);
+      if (el) { el.focus(); document.execCommand('selectAll', false, null); }
+    }, 200);
+    return;
+  }
+
+  /* + 추천 항목 */
+  const seedBtn = e.target.closest('[data-seed]');
+  if (seedBtn) {
+    const cat = seedBtn.dataset.seed;
+    const uid = await currentUid();
+    if (!uid) return;
+    const rows = SEEDS[cat].map((text, i) => ({
+      trip_id: currentTrip.id, category: cat, text, sort_order: i, added_by: uid
+    }));
+    const { error } = await sb.from('checklists').insert(rows);
+    if (error) toast(error.message); else toast(`${CAT_LABELS[cat].title} 추천 항목 추가됨`);
   }
 });
 

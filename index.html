@@ -1041,7 +1041,19 @@ function renderSaved() {
       </div>`;
   }).join('')}</div>`;
 
-  /* del, like, add-itin 은 global delegation에서 처리 */
+  /* del, like, add-itin — onclick 직접 할당 (렌더마다 덮어쓰기) */
+  list.querySelectorAll('[data-del]').forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm('이 장소를 삭제할까?')) await sb.from('places').delete().eq('id', b.dataset.del);
+    };
+  });
+  list.querySelectorAll('[data-like]').forEach(b => {
+    b.onclick = (e) => { e.stopPropagation(); toggleLike(b.dataset.like); };
+  });
+  list.querySelectorAll('[data-add-itin]').forEach(b => {
+    b.onclick = (e) => { e.stopPropagation(); showAddToDayModal(b.dataset.addItin); };
+  });
 }
 
 function showAddToDayModal(placeId) {
@@ -1305,7 +1317,35 @@ function renderItinerary() {
     inp.addEventListener('focus', () => { inp.dataset.prev = inp.value; });
   });
 
-  /* 순서 변경 ▲▼ 과 삭제 × 는 global delegation에서 처리 */
+  /* 순서 변경 ▲▼ 과 삭제 × — onclick 직접 할당 */
+  wrap.querySelectorAll('[data-del-itin]').forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const { error } = await sb.from('itinerary_items').delete().eq('id', b.dataset.delItin);
+      if (error) toast(error.message);
+    };
+  });
+  wrap.querySelectorAll('[data-move]').forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      if (b.disabled) return;
+      const id = b.dataset.id;
+      const direction = b.dataset.move;
+      const item = itinerary.find(it => it.id === id);
+      if (!item) return;
+      const sameDay = itinerary.filter(it => it.date === item.date)
+        .sort((a, x) => (a.sort_order||0) - (x.sort_order||0));
+      const idx = sameDay.findIndex(it => it.id === id);
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= sameDay.length) return;
+      const target = sameDay[targetIdx];
+      await Promise.all([
+        sb.from('itinerary_items').update({ sort_order: target.sort_order }).eq('id', item.id),
+        sb.from('itinerary_items').update({ sort_order: item.sort_order }).eq('id', target.id)
+      ]);
+    };
+  });
+}
 
 /* ============== CHECKLISTS ============== */
 const CAT_LABELS = {
@@ -1330,8 +1370,9 @@ async function loadChecklists() {
 
 function renderChecklists() {
   const grid = $('#check-grid');
-  // 현재 접힌 상태 보존
-  const collapsed = new Set(
+
+  /* 접힌 상태 보존 */
+  const prevCollapsed = new Set(
     [...grid.querySelectorAll('.check-card.collapsed')].map(el => el.dataset.cat)
   );
 
@@ -1339,10 +1380,10 @@ function renderChecklists() {
     const items = checklists.filter(c => c.category === cat);
     const done = items.filter(c => c.checked).length;
     const total = items.length;
-    const isCollapsed = collapsed.has(cat);
+    const isCollapsed = prevCollapsed.has(cat);
     return `
       <div class="check-card ${isCollapsed ? 'collapsed' : ''}" data-cat="${cat}">
-        <div class="check-card-head" data-cat-toggle="${cat}">
+        <div class="check-card-head">
           <div class="check-card-title">${CAT_LABELS[cat].emoji} ${CAT_LABELS[cat].title}</div>
           <div class="check-card-right">
             ${total > 0
@@ -1355,38 +1396,107 @@ function renderChecklists() {
           ${total === 0
             ? '<div class="check-empty">아직 항목이 없어요</div>'
             : items.map(it => `
-                <div class="check-row" data-id="${it.id}">
-                  <input type="checkbox" data-toggle-check="${it.id}" ${it.checked ? 'checked' : ''} />
-                  <div class="check-text" contenteditable="true" data-edit-check="${it.id}">${esc(it.text)}</div>
-                  <button class="check-x" data-del-check="${it.id}" title="삭제">×</button>
+                <div class="check-row ${it.checked ? 'done' : ''}" data-id="${it.id}">
+                  <input type="checkbox" ${it.checked ? 'checked' : ''} />
+                  <div class="check-text" contenteditable="true" data-edit-check="${it.id}"
+                       style="${it.checked ? 'text-decoration:line-through;color:var(--mute-2);' : ''}">${esc(it.text)}</div>
+                  <button class="check-x" title="삭제">×</button>
                 </div>`).join('')
           }
-          <div class="check-add" data-add-check="${cat}">+ 항목 추가</div>
+          <div class="check-add">+ 항목 추가</div>
         </div>
       </div>`;
   }).join('');
 
-  /* 클릭 이벤트는 아래 GLOBAL EVENT DELEGATION에서 처리 */
+  /* ── 핸들러 직접 바인딩 ── */
 
-  /* 텍스트 편집 — focusin으로 위임 (한 번만 등록) */
-  if (!window._checkFocusDelegated) {
-    window._checkFocusDelegated = true;
-    document.addEventListener('focusin', (e) => {
-      const el = e.target.closest('[data-edit-check]');
-      if (!el) return;
-      el.addEventListener('blur', async function onBlur() {
-        el.removeEventListener('blur', onBlur);
-        const id = el.dataset.editCheck;
-        const text = el.innerText.trim();
-        if (!text) { await sb.from('checklists').delete().eq('id', id); return; }
-        await sb.from('checklists').update({ text }).eq('id', id);
-      });
-      el.addEventListener('keydown', function onKey(ev) {
-        if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
-        if (ev.key === 'Escape') { el.blur(); }
-      });
+  /* 카테고리 헤더 클릭 → 접기/펼치기 */
+  grid.querySelectorAll('.check-card-head').forEach(head => {
+    head.onclick = (e) => {
+      /* seed 버튼 클릭은 무시 */
+      if (e.target.closest('.seed-btn')) return;
+      head.closest('.check-card').classList.toggle('collapsed');
+    };
+  });
+
+  /* 추천 항목 시드 */
+  grid.querySelectorAll('.seed-btn').forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const cat = b.closest('.check-card').dataset.cat;
+      const uid = await currentUid(); if (!uid) return;
+      const rows = SEEDS[cat].map((text, i) => ({
+        trip_id: currentTrip.id, category: cat, text, sort_order: i, added_by: uid
+      }));
+      const { error } = await sb.from('checklists').insert(rows);
+      if (error) toast(error.message); else toast(`${CAT_LABELS[cat].title} 추천 항목 추가됨`);
+    };
+  });
+
+  /* 체크박스 → DB 저장 + 즉시 취소선 토글 */
+  grid.querySelectorAll('.check-row').forEach((row, rowIdx) => {
+    const cat = row.closest('.check-card').dataset.cat;
+    const items = checklists.filter(c => c.category === cat);
+    const it = items[rowIdx]; // 같은 카테고리 안에서 순서 일치
+    if (!it) return;
+
+    const cb = row.querySelector('input[type="checkbox"]');
+    const textEl = row.querySelector('.check-text');
+    const xBtn = row.querySelector('.check-x');
+
+    /* 체크박스 */
+    cb.onclick = async (e) => {
+      e.stopPropagation();
+      const checked = cb.checked;
+      if (checked) {
+        textEl.style.textDecoration = 'line-through';
+        textEl.style.color = 'var(--mute-2)';
+        row.classList.add('done');
+      } else {
+        textEl.style.textDecoration = '';
+        textEl.style.color = '';
+        row.classList.remove('done');
+      }
+      const { error } = await sb.from('checklists').update({ checked }).eq('id', it.id);
+      if (error) toast(error.message);
+    };
+
+    /* X 삭제 */
+    xBtn.onclick = async (e) => {
+      e.stopPropagation();
+      const { error } = await sb.from('checklists').delete().eq('id', it.id);
+      if (error) toast(error.message);
+    };
+
+    /* 텍스트 인라인 편집 */
+    textEl.addEventListener('blur', async () => {
+      const text = textEl.innerText.trim();
+      if (!text) { await sb.from('checklists').delete().eq('id', it.id); return; }
+      await sb.from('checklists').update({ text }).eq('id', it.id);
     });
-  }
+    textEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); textEl.blur(); }
+      if (e.key === 'Escape') { textEl.blur(); }
+    });
+  });
+
+  /* + 항목 추가 */
+  grid.querySelectorAll('.check-add').forEach(btn => {
+    const cat = btn.closest('.check-card').dataset.cat;
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const uid = await currentUid(); if (!uid) { toast('다시 로그인해주세요'); return; }
+      const existing = checklists.filter(c => c.category === cat).length;
+      const { data, error } = await sb.from('checklists').insert({
+        trip_id: currentTrip.id, category: cat, text: '새 항목', sort_order: existing, added_by: uid
+      }).select().single();
+      if (error) { toast(error.message); return; }
+      setTimeout(() => {
+        const el = document.querySelector(`[data-edit-check="${data.id}"]`);
+        if (el) { el.focus(); document.execCommand('selectAll', false, null); }
+      }, 200);
+    };
+  });
 }
 
 /* ============== LINKS ============== */
@@ -1419,7 +1529,9 @@ function renderLinks() {
       ${l.category ? `<span class="link-cat">${esc(l.category)}</span>` : ''}
       <button class="link-x" data-del-link="${l.id}" title="삭제">×</button>
     </div>`).join('')}</div>`;
-  /* del-link는 global delegation에서 처리 */
+  wrap.querySelectorAll('[data-del-link]').forEach(b => {
+    b.onclick = async () => { await sb.from('links').delete().eq('id', b.dataset.delLink); };
+  });
 }
 
 $('#btn-add-link').onclick = () => {
@@ -1530,135 +1642,8 @@ $$('[data-close]').forEach(b => b.onclick = () => b.closest('.modal-bg').classLi
 $$('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { $$('.modal-bg.active').forEach(m => m.classList.remove('active')); $('#map-overlay').classList.remove('active'); }});
 
-/* ============== GLOBAL EVENT DELEGATION ============== */
-document.addEventListener('click', async (e) => {
-
-  /* Google 버튼 — onclick이 별도로 있지만 혹시 모를 충돌 방지 */
-  if (e.target.closest('#btn-google')) return;
-
-  /* 일정 삭제 × */
-  const delItin = e.target.closest('[data-del-itin]');
-  if (delItin) {
-    e.stopPropagation();
-    const { error } = await sb.from('itinerary_items').delete().eq('id', delItin.dataset.delItin);
-    if (error) toast(error.message);
-    return;
-  }
-
-  /* 일정 순서 ▲▼ */
-  const moveBtn = e.target.closest('[data-move]');
-  if (moveBtn && !moveBtn.disabled) {
-    e.stopPropagation();
-    const id = moveBtn.dataset.id;
-    const direction = moveBtn.dataset.move;
-    const item = itinerary.find(it => it.id === id);
-    if (!item) return;
-    const sameDay = itinerary.filter(it => it.date === item.date)
-      .sort((a, b) => (a.sort_order||0) - (b.sort_order||0));
-    const idx = sameDay.findIndex(it => it.id === id);
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= sameDay.length) return;
-    const target = sameDay[targetIdx];
-    await Promise.all([
-      sb.from('itinerary_items').update({ sort_order: target.sort_order }).eq('id', item.id),
-      sb.from('itinerary_items').update({ sort_order: item.sort_order }).eq('id', target.id)
-    ]);
-    return;
-  }
-
-  /* 포스트잇 삭제 × */
-  const delPlace = e.target.closest('[data-del]');
-  if (delPlace && delPlace.closest('#saved-list')) {
-    e.stopPropagation();
-    if (confirm('이 장소를 삭제할까?')) {
-      await sb.from('places').delete().eq('id', delPlace.dataset.del);
-    }
-    return;
-  }
-
-  /* 포스트잇 좋아요 */
-  const likeBtn = e.target.closest('[data-like]');
-  if (likeBtn) {
-    e.stopPropagation();
-    await toggleLike(likeBtn.dataset.like);
-    return;
-  }
-
-  /* 포스트잇 + 일정 */
-  const addItinBtn = e.target.closest('[data-add-itin]');
-  if (addItinBtn) {
-    e.stopPropagation();
-    showAddToDayModal(addItinBtn.dataset.addItin);
-    return;
-  }
-
-  /* 링크 삭제 × */
-  const delLink = e.target.closest('[data-del-link]');
-  if (delLink) {
-    await sb.from('links').delete().eq('id', delLink.dataset.delLink);
-    return;
-  }
-
-  /* ── 체크리스트 ── */
-  if (!e.target.closest('#check-grid')) return;
-
-  /* 카테고리 접기/펼치기 */
-  const catHead = e.target.closest('[data-cat-toggle]');
-  if (catHead) {
-    if (e.target.closest('[data-seed],[data-add-check],[data-del-check],[data-toggle-check]')) return;
-    catHead.closest('.check-card')?.classList.toggle('collapsed');
-    return;
-  }
-
-  /* 체크박스 */
-  const cb = e.target.closest('[data-toggle-check]');
-  if (cb && cb.type === 'checkbox') {
-    const { error } = await sb.from('checklists').update({ checked: cb.checked }).eq('id', cb.dataset.toggleCheck);
-    if (error) toast(error.message);
-    return;
-  }
-
-  /* X 삭제 */
-  const delCheck = e.target.closest('[data-del-check]');
-  if (delCheck) {
-    const { error } = await sb.from('checklists').delete().eq('id', delCheck.dataset.delCheck);
-    if (error) toast(error.message);
-    return;
-  }
-
-  /* + 항목 추가 */
-  const addCheck = e.target.closest('[data-add-check]');
-  if (addCheck) {
-    const cat = addCheck.dataset.addCheck;
-    const uid = await currentUid();
-    if (!uid) { toast('다시 로그인해주세요'); return; }
-    const existing = checklists.filter(c => c.category === cat).length;
-    const { data, error } = await sb.from('checklists').insert({
-      trip_id: currentTrip.id, category: cat, text: '새 항목', sort_order: existing, added_by: uid
-    }).select().single();
-    if (error) { toast(error.message); return; }
-    setTimeout(() => {
-      const el = document.querySelector(`[data-edit-check="${data.id}"]`);
-      if (el) { el.focus(); document.execCommand('selectAll', false, null); }
-    }, 200);
-    return;
-  }
-
-  /* + 추천 항목 */
-  const seedBtn = e.target.closest('[data-seed]');
-  if (seedBtn) {
-    const cat = seedBtn.dataset.seed;
-    const uid = await currentUid();
-    if (!uid) return;
-    const rows = SEEDS[cat].map((text, i) => ({
-      trip_id: currentTrip.id, category: cat, text, sort_order: i, added_by: uid
-    }));
-    const { error } = await sb.from('checklists').insert(rows);
-    if (error) toast(error.message); else toast(`${CAT_LABELS[cat].title} 추천 항목 추가됨`);
-  }
-});
-
 bootstrap();
+
 </script>
 </body>
 </html>

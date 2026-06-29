@@ -190,7 +190,17 @@
 
   /* 포스트잇 */
   .postit-list { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-  .postit-card { border-radius: 8px; padding: 12px 14px; box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03); position: relative; transition: transform .15s, box-shadow .15s; }
+  .postit-card { border-radius: 8px; padding: 12px 14px; box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03); position: relative; transition: transform .15s, box-shadow .15s; overflow: hidden; }
+  .postit-photo {
+    width: calc(100% + 28px); margin: -12px -14px 10px;
+    height: 100px; object-fit: cover; display: block;
+    border-radius: 8px 8px 0 0;
+  }
+  .postit-cat {
+    display: inline-block; font-size: 10.5px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+    background: rgba(255,255,255,0.6); margin-bottom: 4px;
+  }
   .postit-card:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 8px 16px rgba(0,0,0,0.06); }
   .postit-bg-1  { background: var(--p1-bg);  color: var(--p1-tx);  }
   .postit-bg-2  { background: var(--p2-bg);  color: var(--p2-tx);  }
@@ -1168,7 +1178,7 @@ async function _fetchPlaceDetail(placeId) {
     _placesService.getDetails({
       placeId,
       sessionToken: token,
-      fields: ['name', 'geometry', 'formatted_address', 'rating', 'types', 'place_id'],
+      fields: ['name', 'geometry', 'formatted_address', 'rating', 'types', 'place_id', 'photos', 'price_level'],
     }, (place, status) => {
       if (status !== google.maps.places.PlacesServiceStatus.OK) { resolve(null); return; }
       resolve(place);
@@ -1176,7 +1186,41 @@ async function _fetchPlaceDetail(placeId) {
   });
 }
 
-/* 검색창 초기화 — Places 자동완성 */
+/* Google place types → 카테고리 */
+const PLACE_TYPE_MAP = {
+  restaurant:          { label: '맛집',   emoji: '🍽' },
+  cafe:                { label: '카페',   emoji: '☕' },
+  bar:                 { label: '바',     emoji: '🍺' },
+  bakery:              { label: '베이커리', emoji: '🥐' },
+  lodging:             { label: '숙소',   emoji: '🏨' },
+  tourist_attraction:  { label: '관광지', emoji: '🎡' },
+  museum:              { label: '박물관', emoji: '🏛' },
+  shopping_mall:       { label: '쇼핑',   emoji: '🛍' },
+  convenience_store:   { label: '편의점', emoji: '🏪' },
+  spa:                 { label: '스파',   emoji: '💆' },
+  night_club:          { label: '나이트클럽', emoji: '🎵' },
+  amusement_park:      { label: '놀이공원', emoji: '🎠' },
+  park:                { label: '공원',   emoji: '🌳' },
+  beach:               { label: '해변',   emoji: '🏖' },
+  temple:              { label: '사원',   emoji: '🛕' },
+  airport:             { label: '공항',   emoji: '✈️' },
+  train_station:       { label: '기차역', emoji: '🚆' },
+  bus_station:         { label: '버스터미널', emoji: '🚌' },
+};
+
+function placeTypeToCategory(types) {
+  if (!types || !types.length) return null;
+  for (const t of types) {
+    if (PLACE_TYPE_MAP[t]) return PLACE_TYPE_MAP[t];
+  }
+  return null;
+}
+
+/* photo reference → 이미지 URL */
+function photoRefUrl(photoRef, maxWidth = 400) {
+  if (!photoRef || !IS_MAP_KEY_SET) return null;
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoRef}&key=${GOOGLE_MAPS_API_KEY}`;
+}
 function initSearchInput() {
   const input = $('#paste-input');
   const dropdown = $('#places-dropdown');
@@ -1263,14 +1307,17 @@ function initSearchInput() {
 
           const lat = detail.geometry?.location?.lat() ?? null;
           const lng = detail.geometry?.location?.lng() ?? null;
+          const cat = placeTypeToCategory(detail.types);
+          const photoRef = detail.photos?.[0]?.photo_reference || null;
 
           await savePlace({
             name: detail.name,
             address: detail.formatted_address || null,
-            lat,
-            lng,
+            lat, lng,
             google_place_id: detail.place_id || null,
             google_rating: detail.rating || null,
+            category: cat ? `${cat.emoji} ${cat.label}` : null,
+            photo_ref: photoRef,
           });
           input.value = '';
         };
@@ -1855,6 +1902,8 @@ async function savePlace(p) {
     lng: p.lng || null,
     google_place_id: p.google_place_id || null,
     google_rating: p.google_rating || null,
+    category: p.category || null,
+    photo_ref: p.photo_ref || null,
     added_by: uid
   });
   if (error) { toast(error.message); return; }
@@ -1907,9 +1956,12 @@ function renderSaved() {
     const likes = p.likes_count || 0;
     const sub = p.address ? p.address.split(',').slice(0,2).join(',') : '';
     const rating = p.google_rating ? `⭐ ${p.google_rating}` : '';
+    const photoUrl = p.photo_ref ? photoRefUrl(p.photo_ref) : null;
     return `
       <div class="postit-card postit-bg-${bg}" data-id="${p.id}">
+        ${photoUrl ? `<img class="postit-photo" src="${photoUrl}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()" />` : ''}
         <button class="postit-x" data-del="${p.id}" title="삭제">×</button>
+        ${p.category ? `<div class="postit-cat">${esc(p.category)}</div>` : ''}
         <div class="postit-name">${esc(p.name)}</div>
         ${sub ? `<div class="postit-meta">${esc(sub)}</div>` : ''}
         <div class="postit-by" style="justify-content:space-between;">

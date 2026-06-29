@@ -1,0 +1,4 @@
+{
+  "buildCommand": "sed -i 's/GMAPS_KEY_PLACEHOLDER/'\"$VITE_GOOGLE_MAPS_API_KEY\"'/g' index.html",
+  "outputDirectory": "."
+}

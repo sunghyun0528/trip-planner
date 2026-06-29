@@ -204,6 +204,52 @@
     font-weight: 600; color: var(--ink-soft);
   }
   .day-weather .emoji { font-size: 18px; }
+
+  /* 날씨 대형 카드 */
+  .weather-card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-l); margin-bottom: 14px; overflow: hidden;
+  }
+  .weather-card-head {
+    padding: 14px 18px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .weather-card-title { font-size: 12px; font-weight: 700; color: var(--mute); letter-spacing: 0.04em; text-transform: uppercase; }
+  .weather-days-scroll {
+    display: flex; gap: 8px; padding: 0 18px 14px; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .weather-days-scroll::-webkit-scrollbar { display: none; }
+  .weather-day-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--line-2);
+    cursor: pointer; transition: all .15s; flex-shrink: 0; min-width: 72px;
+    background: var(--bg);
+  }
+  .weather-day-btn:hover { border-color: var(--ink); }
+  .weather-day-btn.active {
+    background: var(--ink); border-color: var(--ink);
+    color: #fff;
+  }
+  .weather-day-btn .wx-day-label { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; opacity: 0.7; }
+  .weather-day-btn .wx-day-date { font-size: 12px; font-weight: 600; }
+  .weather-day-btn .wx-day-emoji { font-size: 22px; line-height: 1.2; }
+  .weather-day-btn .wx-day-temp { font-size: 11px; font-weight: 600; opacity: 0.85; }
+
+  /* 날씨 상세 패널 */
+  .weather-detail {
+    border-top: 1px solid var(--line); padding: 16px 18px;
+    display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  }
+  .weather-detail-main { display: flex; align-items: center; gap: 16px; }
+  .weather-detail-emoji { font-size: 52px; line-height: 1; }
+  .weather-detail-temp { }
+  .weather-detail-max { font-size: 36px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .weather-detail-min { font-size: 16px; color: var(--mute); font-weight: 500; margin-top: 2px; }
+  .weather-detail-desc { font-size: 14px; font-weight: 600; color: var(--ink-soft); margin-top: 4px; }
+  .weather-detail-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+  .weather-stat { display: flex; flex-direction: column; gap: 2px; }
+  .weather-stat-label { font-size: 10px; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 0.04em; }
+  .weather-stat-value { font-size: 15px; font-weight: 700; color: var(--ink); }
   .day-stats { color: var(--mute); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .day-stats-budget { color: var(--mute-2); font-size: 11.5px; font-weight: 500; }
 
@@ -499,14 +545,19 @@
         <!-- 대시보드 -->
         <div class="dashboard" id="dashboard"></div>
 
-        <!-- 여행 정보 (인원·테마) -->
+        <!-- 여행 정보 (인원·테마·여행지) -->
         <div class="trip-info-card" id="trip-info-card">
           <div class="info-block">
             <span class="info-label">👥 인원</span>
             <input type="number" class="info-input" id="trip-headcount" min="1" max="50" placeholder="—" style="width:60px;" />
             <span style="color:var(--mute);font-size:12px;font-weight:500;">명</span>
           </div>
-          <div style="width:1px;height:24px;background:var(--line);"></div>
+          <div style="width:1px;height:24px;background:var(--line);flex-shrink:0;"></div>
+          <div class="info-block" style="flex:1;">
+            <span class="info-label">📍 여행지</span>
+            <input type="text" class="info-input" id="trip-destinations" placeholder="방콕, 푸켓 (쉼표로 구분)" />
+          </div>
+          <div style="width:1px;height:24px;background:var(--line);flex-shrink:0;"></div>
           <div class="info-block" style="flex:1;">
             <span class="info-label">💭 테마</span>
             <input type="text" class="info-input theme-input" id="trip-theme" placeholder="어떤 여행이 될 것 같아? ✨" />
@@ -618,6 +669,7 @@
     <h2>여행 정보 수정</h2>
     <p class="lede">여행 이름과 날짜를 바꿀 수 있어요</p>
     <div class="field"><label>여행 이름</label><input type="text" class="input" id="et-name" /></div>
+    <div class="field"><label>여행지 <span style="font-weight:500;color:var(--mute)">(날씨 표시용, 쉼표로 구분)</span></label><input type="text" class="input" id="et-destinations" placeholder="방콕, 푸켓" /></div>
     <div class="row">
       <div class="field"><label>시작일</label><input type="date" class="input" id="et-start" /></div>
       <div class="field"><label>종료일</label><input type="date" class="input" id="et-end" /></div>
@@ -634,6 +686,7 @@
     <h2>새 여행 만들기</h2>
     <p class="lede">언제 어디로 떠나? 일단 가볍게 시작해보자 🌴</p>
     <div class="field"><label>여행 이름</label><input type="text" class="input" id="nt-name" placeholder="방콕 · 푸켓" /></div>
+    <div class="field"><label>여행지 <span style="font-weight:500;color:var(--mute)">(날씨 표시용, 쉼표로 구분)</span></label><input type="text" class="input" id="nt-destinations" placeholder="방콕, 푸켓" /></div>
     <div class="row">
       <div class="field"><label>시작일</label><input type="date" class="input" id="nt-start" /></div>
       <div class="field"><label>종료일</label><input type="date" class="input" id="nt-end" /></div>
@@ -742,8 +795,11 @@ let members = [];
 let memberByUid = {};
 let checklists = [];
 let links = [];
-let weatherByDate = {};
-let weatherState = 'none';
+let weatherByDate = {};       // { "2026-10-26": { code, max, min } }
+let weatherState = 'none';    // per destination
+let weatherByDest = {};       // { "방콕": { state, byDate: {} } }
+let selectedWeatherDay = null;
+let selectedWeatherDest = null; // 현재 선택된 여행지
 let map = null, mapMarkers = [], mapInited = false;
 let realtimeChannel = null;
 let pendingAddPlace = null;
@@ -810,68 +866,216 @@ function parseMapLink(input) {
 }
 
 /* ============== 날씨 (Open-Meteo) ============== */
-function weatherEmoji(code) {
-  if (code == null) return '';
-  if (code === 0) return '☀️';
-  if (code <= 2) return '🌤';
-  if (code === 3) return '☁️';
-  if (code >= 45 && code <= 48) return '🌫';
-  if (code >= 51 && code <= 67) return '🌧';
-  if (code >= 71 && code <= 77) return '❄️';
-  if (code >= 80 && code <= 82) return '🌦';
-  if (code >= 95) return '⛈';
-  return '';
+function weatherInfo(code) {
+  if (code == null) return { emoji: '—', desc: '정보 없음' };
+  if (code === 0)               return { emoji: '☀️',  desc: '맑음' };
+  if (code <= 2)                return { emoji: '🌤',  desc: '구름 조금' };
+  if (code === 3)               return { emoji: '☁️',  desc: '흐림' };
+  if (code >= 45 && code <= 48) return { emoji: '🌫',  desc: '안개' };
+  if (code >= 51 && code <= 55) return { emoji: '🌦',  desc: '이슬비' };
+  if (code >= 56 && code <= 57) return { emoji: '🌧',  desc: '어는 비' };
+  if (code >= 61 && code <= 65) return { emoji: '🌧',  desc: '비' };
+  if (code >= 66 && code <= 67) return { emoji: '🌨',  desc: '진눈깨비' };
+  if (code >= 71 && code <= 77) return { emoji: '❄️',  desc: '눈' };
+  if (code >= 80 && code <= 82) return { emoji: '🌦',  desc: '소나기' };
+  if (code >= 85 && code <= 86) return { emoji: '🌨',  desc: '눈 소나기' };
+  if (code >= 95)               return { emoji: '⛈',  desc: '뇌우' };
+  return { emoji: '🌡', desc: '기타' };
+}
+function weatherEmoji(code) { return weatherInfo(code).emoji; }
+
+/* 날씨 카드 HTML 생성 */
+
+/* 여행지 목록 파싱 */
+function getDestinations() {
+  const raw = currentTrip.destinations || [];
+  if (raw.length > 0) return raw;
+  // destinations 없으면 빈 배열 (이름에서 더 이상 추출 안 함)
+  return [];
 }
 
-/* 여행지 → 좌표 (Nominatim) — trips에 캐싱 */
-async function ensureDestCoords() {
-  if (currentTrip.dest_lat && currentTrip.dest_lng) return { lat: currentTrip.dest_lat, lng: currentTrip.dest_lng };
-  if (!currentTrip.name) return null;
+/* 단일 여행지 → 좌표 (Nominatim, dest_coords jsonb에 캐싱) */
+async function geocodeDest(name) {
+  const cached = currentTrip.dest_coords || {};
+  if (cached[name]) return cached[name];
   try {
-    // 이름이 "방콕·푸켓"처럼 복합이면 첫 번째 지역만 검색 (Nominatim은 복합 지명에 약함)
-    const q = currentTrip.name
-      .split(/[·,\/\-&]/)  // 구분자로 쪼개기
-      .map(s => s.trim())
-      .filter(Boolean)[0] || currentTrip.name.trim();
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
-      headers: { 'Accept-Language': 'ko,en' }
-    });
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(name)}&format=json&limit=1`,
+      { headers: { 'Accept-Language': 'ko,en' } }
+    );
     const data = await res.json();
     if (!data || data.length === 0) return null;
-    const lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
-    await sb.from('trips').update({ dest_lat: lat, dest_lng: lng }).eq('id', currentTrip.id);
-    currentTrip.dest_lat = lat; currentTrip.dest_lng = lng;
-    return { lat, lng };
+    const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    const newCache = { ...cached, [name]: coords };
+    await sb.from('trips').update({ dest_coords: newCache }).eq('id', currentTrip.id);
+    currentTrip.dest_coords = newCache;
+    return coords;
   } catch { return null; }
 }
 
 async function loadWeather() {
+  weatherByDest = {};
   weatherByDate = {};
-  weatherState = 'none'; // 'none' | 'too-far' | 'loaded' | 'no-coords'
+  weatherState = 'none';
   if (!currentTrip?.start_date || !currentTrip?.end_date) return;
-  const coords = await ensureDestCoords();
-  if (!coords) { weatherState = 'no-coords'; return; }
-  // Open-Meteo: 16일 이내만 예보
+
+  const dests = getDestinations();
+  if (dests.length === 0) { weatherState = 'no-dest'; return; }
+
   const dd = daysUntil(currentTrip.start_date);
   if (dd != null && dd > 16) { weatherState = 'too-far'; return; }
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${currentTrip.start_date}&end_date=${currentTrip.end_date}`;
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const data = await res.json();
-    const dates = data.daily?.time || [];
-    dates.forEach((d, i) => {
-      weatherByDate[d] = {
-        code: data.daily.weather_code[i],
-        max: data.daily.temperature_2m_max[i],
-        min: data.daily.temperature_2m_min[i]
-      };
-    });
+
+  // 여행지별로 병렬 지오코딩 + 날씨 요청
+  const results = await Promise.all(dests.map(async (name) => {
+    const coords = await geocodeDest(name);
+    if (!coords) return { name, state: 'no-coords', byDate: {} };
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${currentTrip.start_date}&end_date=${currentTrip.end_date}`;
+      const res = await fetch(url);
+      if (!res.ok) return { name, state: 'error', byDate: {} };
+      const data = await res.json();
+      const byDate = {};
+      (data.daily?.time || []).forEach((d, i) => {
+        byDate[d] = {
+          code: data.daily.weather_code[i],
+          max: data.daily.temperature_2m_max[i],
+          min: data.daily.temperature_2m_min[i]
+        };
+      });
+      return { name, state: 'loaded', byDate };
+    } catch { return { name, state: 'error', byDate: {} }; }
+  }));
+
+  results.forEach(r => { weatherByDest[r.name] = r; });
+
+  const loaded = results.filter(r => r.state === 'loaded');
+  if (loaded.length > 0) {
     weatherState = 'loaded';
-  } catch {}
+    // 기본 선택 여행지
+    if (!selectedWeatherDest || !weatherByDest[selectedWeatherDest]) {
+      selectedWeatherDest = loaded[0].name;
+    }
+    weatherByDate = weatherByDest[selectedWeatherDest]?.byDate || {};
+  } else if (results.every(r => r.state === 'no-coords')) {
+    weatherState = 'no-coords';
+  } else {
+    weatherState = 'error';
+  }
 }
 
-/* ============== AUTH ============== */
+
+/* 날씨 카드 HTML 생성 */
+function renderWeatherCard() {
+  if (!currentTrip.start_date || !currentTrip.end_date) return '';
+  if (weatherState === 'none') return '';
+
+  const days = daysBetween(currentTrip.start_date, currentTrip.end_date);
+  const dests = getDestinations();
+
+  /* 여행지 미입력 */
+  if (weatherState === 'no-dest' || dests.length === 0) {
+    return `<div class="weather-card" style="margin-bottom:14px;">
+      <div class="weather-card-head">
+        <span class="weather-card-title">🌤 날씨 예보</span>
+        <span style="font-size:12px;color:var(--mute);font-weight:500;">아래 여행지 칸에 도시명을 입력하면 날씨가 표시됩니다</span>
+      </div>
+    </div>`;
+  }
+
+  /* 출발 16일 초과 */
+  if (weatherState === 'too-far') {
+    const dd = daysUntil(currentTrip.start_date);
+    return `<div class="weather-card" style="margin-bottom:14px;">
+      <div class="weather-card-head">
+        <div>
+          <span class="weather-card-title">🌤 날씨 예보</span>
+          <div style="font-size:15px;font-weight:700;color:var(--ink);margin-top:2px;">${dests.map(esc).join(' · ')}</div>
+        </div>
+        <span style="font-size:12px;color:var(--mute);font-weight:500;">출발 16일 전부터 표시됩니다 (현재 D-${dd})</span>
+      </div>
+    </div>`;
+  }
+
+  /* 좌표 못 찾음 */
+  if (weatherState === 'no-coords' || weatherState === 'error') {
+    return `<div class="weather-card" style="margin-bottom:14px;">
+      <div class="weather-card-head">
+        <div>
+          <span class="weather-card-title">🌤 날씨 예보</span>
+          <div style="font-size:15px;font-weight:700;color:var(--ink);margin-top:2px;">${dests.map(esc).join(' · ')}</div>
+        </div>
+        <span style="font-size:12px;color:var(--mute);font-weight:500;">위치를 찾지 못했어요 · 정확한 도시명을 입력해주세요 (예: 방콕, 도쿄)</span>
+      </div>
+    </div>`;
+  }
+
+  if (weatherState !== 'loaded') return '';
+
+  /* 선택된 여행지 / 날짜 기본값 */
+  const loadedDests = dests.filter(d => weatherByDest[d]?.state === 'loaded');
+  if (!selectedWeatherDest || !weatherByDest[selectedWeatherDest] || weatherByDest[selectedWeatherDest].state !== 'loaded') {
+    selectedWeatherDest = loadedDests[0] || null;
+  }
+  if (!selectedWeatherDest) return '';
+
+  const curByDate = weatherByDest[selectedWeatherDest].byDate;
+  if (!selectedWeatherDay || !curByDate[selectedWeatherDay]) {
+    selectedWeatherDay = days.find(d => curByDate[d]) || null;
+  }
+  if (!selectedWeatherDay) return '';
+
+  const sel = curByDate[selectedWeatherDay];
+  const { emoji, desc } = weatherInfo(sel.code);
+  const selDate = new Date(selectedWeatherDay + 'T00:00:00');
+  const selWd = WEEKDAY[selDate.getDay()];
+  const selDayIdx = days.indexOf(selectedWeatherDay);
+
+  return `<div class="weather-card" id="weather-card">
+    <div class="weather-card-head">
+      <div>
+        <span class="weather-card-title">🌤 날씨 예보</span>
+        <!-- 여행지 선택 버튼 (2개 이상일 때만) -->
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+          ${loadedDests.map(d => `
+            <button class="cat-tab ${d === selectedWeatherDest ? 'active' : ''}" data-wx-dest="${esc(d)}"
+                    style="font-size:13px;padding:4px 12px;">
+              ${esc(d)}
+            </button>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="weather-days-scroll">
+      ${days.map((d, i) => {
+        const wx = curByDate[d];
+        if (!wx) return '';
+        const { emoji: em } = weatherInfo(wx.code);
+        const isActive = d === selectedWeatherDay;
+        return `<div class="weather-day-btn ${isActive ? 'active' : ''}" data-wx-day="${d}">
+          <div class="wx-day-label">Day ${i+1}</div>
+          <div class="wx-day-date">${fmtDate(d).replace('일','')}</div>
+          <div class="wx-day-emoji">${em}</div>
+          <div class="wx-day-temp">${Math.round(wx.max)}° / ${Math.round(wx.min)}°</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="weather-detail">
+      <div class="weather-detail-main">
+        <div class="weather-detail-emoji">${emoji}</div>
+        <div class="weather-detail-temp">
+          <div class="weather-detail-max">${Math.round(sel.max)}°</div>
+          <div class="weather-detail-min">최저 ${Math.round(sel.min)}°</div>
+          <div class="weather-detail-desc">${desc}</div>
+        </div>
+      </div>
+      <div class="weather-detail-stats">
+        <div class="weather-stat"><div class="weather-stat-label">날짜</div><div class="weather-stat-value">${fmtDate(selectedWeatherDay)} ${selWd}요일</div></div>
+        <div class="weather-stat"><div class="weather-stat-label">Day</div><div class="weather-stat-value">${selDayIdx + 1} / ${days.length}</div></div>
+        <div class="weather-stat"><div class="weather-stat-label">최고기온</div><div class="weather-stat-value">${Math.round(sel.max)}°C</div></div>
+        <div class="weather-stat"><div class="weather-stat-label">최저기온</div><div class="weather-stat-value">${Math.round(sel.min)}°C</div></div>
+      </div>
+    </div>
+  </div>`;
+}
 async function bootstrap() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) await handleSignedIn(session.user);
@@ -928,6 +1132,7 @@ $('#btn-edit-trip').onclick = () => {
   $('#et-name').value = currentTrip.name || '';
   $('#et-start').value = currentTrip.start_date || '';
   $('#et-end').value = currentTrip.end_date || '';
+  $('#et-destinations').value = (currentTrip.destinations || []).join(', ');
   openModal('modal-edit-trip');
   setTimeout(() => $('#et-name').focus(), 100);
 };
@@ -936,14 +1141,14 @@ $('#btn-save-trip-edit').onclick = async () => {
   const name = $('#et-name').value.trim();
   const start = $('#et-start').value || null;
   const end = $('#et-end').value || null;
+  const destRaw = $('#et-destinations').value.trim();
+  const destinations = destRaw ? destRaw.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : [];
   if (!name) { toast('이름을 입력해줘'); return; }
   if (start && end && start > end) { toast('종료일이 시작일보다 빨라요'); return; }
 
   const { error } = await sb.from('trips').update({
-    name, start_date: start, end_date: end,
-    // 이름이 바뀌면 좌표 캐시도 초기화
-    dest_lat: name !== currentTrip.name ? null : currentTrip.dest_lat,
-    dest_lng: name !== currentTrip.name ? null : currentTrip.dest_lng,
+    name, start_date: start, end_date: end, destinations,
+    dest_coords: {},  // 여행지 바뀔 수 있으니 좌표 캐시 초기화
   }).eq('id', currentTrip.id);
 
   if (error) { toast(error.message); return; }
@@ -951,18 +1156,21 @@ $('#btn-save-trip-edit').onclick = async () => {
   currentTrip.name = name;
   currentTrip.start_date = start;
   currentTrip.end_date = end;
-  if (name !== currentTrip.name) { currentTrip.dest_lat = null; currentTrip.dest_lng = null; }
+  currentTrip.destinations = destinations;
+  currentTrip.dest_coords = {};
 
   $('#current-name').textContent = name;
   $('#current-meta-text').textContent = fmtDateRange(start, end);
+  $('#trip-destinations').value = destinations.join(', ');
+
+  selectedWeatherDest = null; selectedWeatherDay = null;
+  weatherByDest = {}; weatherByDate = {}; weatherState = 'none';
 
   closeModal('modal-edit-trip');
   toast('수정됐어요 ✅');
 
-  // 날짜 바뀌면 일정/대시보드 다시 그리기
   renderItinerary();
   renderDashboard();
-  // 이름 바뀌면 날씨 다시 로드
   loadWeather().then(() => renderItinerary());
 };
 
@@ -991,13 +1199,15 @@ $('#btn-create-trip').onclick = async () => {
   const end = $('#nt-end').value || null;
   const headcount = parseInt($('#nt-headcount').value) || null;
   const theme = $('#nt-theme').value.trim() || null;
+  const destRaw = $('#nt-destinations').value.trim();
+  const destinations = destRaw ? destRaw.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : [];
   if (!name) { toast('이름을 입력해줘'); return; }
   if (start && end && start > end) { toast('종료일이 시작일보다 빨라요'); return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!session?.user?.id) { toast('다시 로그인해주세요.'); await sb.auth.signOut(); return; }
   user = session.user;
   const { data, error } = await sb.from('trips').insert({
-    name, start_date: start, end_date: end, headcount, theme, owner_id: session.user.id
+    name, start_date: start, end_date: end, headcount, theme, destinations, owner_id: session.user.id
   }).select().single();
   if (error) { toast(error.message); return; }
   closeModal('modal-new-trip');
@@ -1027,6 +1237,7 @@ async function openTrip(tripId) {
   $('#current-meta-text').textContent = fmtDateRange(trip.start_date, trip.end_date);
   $('#trip-headcount').value = trip.headcount || '';
   $('#trip-theme').value = trip.theme || '';
+  $('#trip-destinations').value = (trip.destinations || []).join(', ');
   showScreen('screen-app');
   await upsertMyMemberInfo();
   await Promise.all([loadMembers(), loadSavedPlaces(), loadMyLikes(), loadItinerary(), loadChecklists(), loadLinks(), loadExpenses()]);
@@ -1069,6 +1280,18 @@ $('#trip-theme').addEventListener('change', async (e) => {
   const v = e.target.value.trim() || null;
   await sb.from('trips').update({ theme: v }).eq('id', currentTrip.id);
   currentTrip.theme = v;
+});
+$('#trip-destinations').addEventListener('change', async (e) => {
+  // 쉼표로 구분, 공백 제거, 빈 항목 제거
+  const raw = e.target.value.trim();
+  const dests = raw ? raw.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : [];
+  await sb.from('trips').update({ destinations: dests, dest_coords: {} }).eq('id', currentTrip.id);
+  currentTrip.destinations = dests;
+  currentTrip.dest_coords = {};
+  selectedWeatherDest = null; selectedWeatherDay = null;
+  weatherByDest = {}; weatherByDate = {}; weatherState = 'none';
+  // 날씨 다시 로드
+  loadWeather().then(() => renderItinerary());
 });
 
 /* ============== MEMBERS ============== */
@@ -1318,19 +1541,8 @@ function renderItinerary() {
     return;
   }
 
-  /* 날씨 안내 배너 (상단, 일정 위) */
-  let wxBanner = '';
-  if (weatherState === 'too-far') {
-    const dd = daysUntil(currentTrip.start_date);
-    wxBanner = `<div style="margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);font-size:12.5px;color:var(--mute);font-weight:500;display:flex;align-items:center;gap:8px;">
-      🌤 날씨 예보는 출발 <b style="color:var(--ink)">16일 전</b>부터 표시됩니다 (현재 D-${dd})
-    </div>`;
-  } else if (weatherState === 'no-coords') {
-    const firstName = (currentTrip.name || '').split(/[·,\/\-&]/)[0].trim();
-    wxBanner = `<div style="margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);font-size:12.5px;color:var(--mute);font-weight:500;display:flex;align-items:center;gap:8px;">
-      🌤 <span><b style="color:var(--ink)">"${esc(firstName)}"</b> 위치를 찾지 못했어요. 여행 이름에 정확한 도시명이 있으면 날씨가 자동으로 표시됩니다 (예: 방콕, 도쿄, 파리)</span>
-    </div>`;
-  }
+  /* 날씨 카드 (상단 대형) */
+  const wxCardHtml = renderWeatherCard();
 
   /* 시간 선택 옵션 생성 (00:00 ~ 23:30, 30분 단위) */
   function makeTimeOptions(selected) {
@@ -1354,7 +1566,7 @@ function renderItinerary() {
   }
 
   const days = daysBetween(currentTrip.start_date, currentTrip.end_date);
-  wrap.innerHTML = wxBanner + days.map((d, i) => {
+  wrap.innerHTML = wxCardHtml + days.map((d, i) => {
     /* 시간순 정렬: 시간 있는 항목 먼저, 그 다음 sort_order */
     const items = itinerary.filter(it => it.date === d).sort((a, b) => {
       const at = a.start_time || '99:99';
@@ -1365,10 +1577,6 @@ function renderItinerary() {
     const wd = WEEKDAY[new Date(d + 'T00:00:00').getDay()];
     const collapsed = collapsedDays.has(d);
     const dayCost = items.reduce((s, it) => s + (it.estimated_cost || 0), 0);
-    const wx = weatherByDate[d];
-    const wxHtml = wx
-      ? `<div class="day-weather"><span class="emoji">${weatherEmoji(wx.code)}</span><span>${Math.round(wx.max)}° / ${Math.round(wx.min)}°</span></div>`
-      : '';
     return `
       <div class="day-block ${collapsed ? 'collapsed' : ''}" data-date="${d}">
         <div class="day-header" data-toggle="${d}">
@@ -1380,7 +1588,6 @@ function renderItinerary() {
             </div>
           </div>
           <div class="day-header-right">
-            ${wxHtml}
             <div class="day-stats">
               <span>예산</span>
               <span class="day-stats-budget">${dayCost > 0 ? dayCost.toLocaleString() + '원' : '—'}</span>
@@ -1424,6 +1631,33 @@ function renderItinerary() {
 
   /* Day 토글 */
   wrap.querySelectorAll('[data-toggle]').forEach(h => {
+
+  /* 날씨 날짜/여행지 선택 — 카드만 교체 */
+  function rebindWeatherCard() {
+    const card = document.getElementById('weather-card');
+    if (!card) return;
+    card.querySelectorAll('[data-wx-dest]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        selectedWeatherDest = btn.dataset.wxDest;
+        weatherByDate = weatherByDest[selectedWeatherDest]?.byDate || {};
+        selectedWeatherDay = null; // 지역 바뀌면 날짜도 초기화
+        const newHtml = renderWeatherCard();
+        const tmp = document.createElement('div'); tmp.innerHTML = newHtml;
+        if (tmp.firstElementChild) { card.replaceWith(tmp.firstElementChild); rebindWeatherCard(); }
+      };
+    });
+    card.querySelectorAll('[data-wx-day]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        selectedWeatherDay = btn.dataset.wxDay;
+        const newHtml = renderWeatherCard();
+        const tmp = document.createElement('div'); tmp.innerHTML = newHtml;
+        if (tmp.firstElementChild) { card.replaceWith(tmp.firstElementChild); rebindWeatherCard(); }
+      };
+    });
+  }
+  rebindWeatherCard();
     h.onclick = (e) => {
       if (e.target.closest('input, textarea, button, a')) return;
       const d = h.dataset.toggle;

@@ -331,6 +331,53 @@
   .link-x { color: var(--mute-2); padding: 4px 8px; font-size: 16px; }
   .link-x:hover { color: var(--error); background: rgba(178,58,58,0.08); border-radius: 4px; }
 
+  /* 지출 섹션 */
+  .expense-summary {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;
+  }
+  .expense-summary-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l);
+    padding: 12px 16px;
+  }
+  .expense-summary-label { font-size: 11px; font-weight: 700; color: var(--mute); margin-bottom: 4px; }
+  .expense-summary-value { font-size: 20px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .expense-summary-sub { font-size: 11px; color: var(--mute); margin-top: 3px; font-weight: 500; }
+
+  .expense-table {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden;
+  }
+  .expense-table-head {
+    display: grid; grid-template-columns: 80px 1fr 90px 110px 70px 36px;
+    padding: 8px 14px; border-bottom: 1px solid var(--line);
+    font-size: 10px; font-weight: 700; color: var(--mute); letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .expense-row {
+    display: grid; grid-template-columns: 80px 1fr 90px 110px 70px 36px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line); align-items: center;
+    transition: background .15s;
+  }
+  .expense-row:last-child { border-bottom: none; }
+  .expense-row:hover { background: var(--bg); }
+  .expense-cell { font-size: 13px; font-weight: 500; color: var(--ink); min-width: 0; }
+  .expense-cell.mute { color: var(--mute); font-size: 12px; }
+  .expense-cat-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px;
+    border-radius: 999px; background: var(--line); color: var(--mute);
+  }
+  .expense-amount { font-weight: 700; text-align: right; }
+  .expense-krw { font-size: 11.5px; color: var(--mute); text-align: right; font-weight: 500; }
+  .expense-del { color: var(--mute-2); padding: 4px 8px; font-size: 15px; text-align: center; }
+  .expense-del:hover { color: var(--error); background: rgba(178,58,58,0.08); border-radius: 4px; }
+  .expense-empty { padding: 24px; text-align: center; color: var(--mute-2); font-size: 13px; font-weight: 500; }
+
+  .cat-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .cat-tab {
+    padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line-2);
+    font-size: 12px; font-weight: 600; color: var(--mute); cursor: pointer; transition: all .15s;
+  }
+  .cat-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .cat-tab:hover:not(.active) { border-color: var(--ink); color: var(--ink); }
+
   /* 지도 */
   .leaflet-popup-content { font-family: inherit; font-size: 13px; font-weight: 500; }
   .leaflet-popup-content img { border-radius: 4px; margin-bottom: 6px; max-width: 180px; }
@@ -413,9 +460,12 @@
   <header class="app-header">
     <div class="h-left">
       <button class="btn btn-ghost" id="btn-back" title="여행 목록">←</button>
-      <div style="min-width: 0;">
+      <div style="min-width: 0; cursor: pointer;" id="btn-edit-trip" title="여행 정보 수정">
         <div class="trip-name" id="current-name"></div>
-        <div class="trip-meta" id="current-meta"></div>
+        <div class="trip-meta" id="current-meta" style="display:flex;align-items:center;gap:6px;">
+          <span id="current-meta-text"></span>
+          <span style="font-size:10px;color:var(--mute-2);font-weight:500;">✏️ 수정</span>
+        </div>
       </div>
     </div>
     <div class="h-right">
@@ -477,6 +527,18 @@
           <button class="add-btn" id="btn-add-link">+ 추가</button>
         </div>
         <div id="link-list-wrap"></div>
+
+        <!-- 지출 -->
+        <div class="section-title">
+          💸 지출 관리
+          <button class="add-btn" id="btn-add-expense">+ 지출 추가</button>
+        </div>
+        <div id="expense-wrap"></div>
+
+        <!-- JSON 내보내기 -->
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end;">
+          <button class="btn btn-secondary btn-sm" id="btn-export-json">📥 플래너 내보내기</button>
+        </div>
       </div>
     </main>
 
@@ -499,6 +561,74 @@
 </div>
 
 <!-- MODALS -->
+<div class="modal-bg" id="modal-expense">
+  <div class="modal">
+    <h2>지출 추가</h2>
+    <p class="lede">얼마를 어디에 썼어? 💸</p>
+    <div class="row">
+      <div class="field"><label>날짜 (선택)</label><input type="date" class="input" id="ex-date" /></div>
+      <div class="field">
+        <label>카테고리</label>
+        <select class="input" id="ex-cat">
+          <option value="flight">✈️ 항공</option>
+          <option value="hotel">🏨 숙소</option>
+          <option value="food" selected>🍜 식비</option>
+          <option value="transport">🚌 교통</option>
+          <option value="shopping">🛍 쇼핑</option>
+          <option value="activity">🎡 액티비티</option>
+          <option value="etc">📦 기타</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:2;">
+        <label>금액</label>
+        <input type="number" class="input" id="ex-amount" placeholder="0" min="0" step="any" />
+      </div>
+      <div class="field">
+        <label>통화</label>
+        <select class="input" id="ex-currency">
+          <option value="KRW">🇰🇷 KRW</option>
+          <option value="THB">🇹🇭 THB</option>
+          <option value="JPY">🇯🇵 JPY</option>
+          <option value="USD">🇺🇸 USD</option>
+          <option value="EUR">🇪🇺 EUR</option>
+          <option value="SGD">🇸🇬 SGD</option>
+          <option value="VND">🇻🇳 VND</option>
+          <option value="MYR">🇲🇾 MYR</option>
+          <option value="TWD">🇹🇼 TWD</option>
+          <option value="HKD">🇭🇰 HKD</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>메모 (선택)</label>
+      <input type="text" class="input" id="ex-memo" placeholder="카오산 로드 저녁 식사" />
+    </div>
+    <div id="ex-krw-preview" style="font-size:12.5px;color:var(--mute);margin:-8px 0 12px;font-weight:500;min-height:18px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>취소</button>
+      <button class="btn btn-accent" id="btn-expense-save">추가</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-edit-trip">
+  <div class="modal">
+    <h2>여행 정보 수정</h2>
+    <p class="lede">여행 이름과 날짜를 바꿀 수 있어요</p>
+    <div class="field"><label>여행 이름</label><input type="text" class="input" id="et-name" /></div>
+    <div class="row">
+      <div class="field"><label>시작일</label><input type="date" class="input" id="et-start" /></div>
+      <div class="field"><label>종료일</label><input type="date" class="input" id="et-end" /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>취소</button>
+      <button class="btn btn-accent" id="btn-save-trip-edit">저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal-new-trip">
   <div class="modal">
     <h2>새 여행 만들기</h2>
@@ -794,6 +924,48 @@ sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') { user = null; currentTrip = null; showScreen('screen-auth'); }
 });
 
+$('#btn-edit-trip').onclick = () => {
+  $('#et-name').value = currentTrip.name || '';
+  $('#et-start').value = currentTrip.start_date || '';
+  $('#et-end').value = currentTrip.end_date || '';
+  openModal('modal-edit-trip');
+  setTimeout(() => $('#et-name').focus(), 100);
+};
+
+$('#btn-save-trip-edit').onclick = async () => {
+  const name = $('#et-name').value.trim();
+  const start = $('#et-start').value || null;
+  const end = $('#et-end').value || null;
+  if (!name) { toast('이름을 입력해줘'); return; }
+  if (start && end && start > end) { toast('종료일이 시작일보다 빨라요'); return; }
+
+  const { error } = await sb.from('trips').update({
+    name, start_date: start, end_date: end,
+    // 이름이 바뀌면 좌표 캐시도 초기화
+    dest_lat: name !== currentTrip.name ? null : currentTrip.dest_lat,
+    dest_lng: name !== currentTrip.name ? null : currentTrip.dest_lng,
+  }).eq('id', currentTrip.id);
+
+  if (error) { toast(error.message); return; }
+
+  currentTrip.name = name;
+  currentTrip.start_date = start;
+  currentTrip.end_date = end;
+  if (name !== currentTrip.name) { currentTrip.dest_lat = null; currentTrip.dest_lng = null; }
+
+  $('#current-name').textContent = name;
+  $('#current-meta-text').textContent = fmtDateRange(start, end);
+
+  closeModal('modal-edit-trip');
+  toast('수정됐어요 ✅');
+
+  // 날짜 바뀌면 일정/대시보드 다시 그리기
+  renderItinerary();
+  renderDashboard();
+  // 이름 바뀌면 날씨 다시 로드
+  loadWeather().then(() => renderItinerary());
+};
+
 /* ============== TRIPS LIST ============== */
 async function loadTrips() {
   const { data, error } = await sb.from('trips').select('*').order('created_at', { ascending: false });
@@ -847,21 +1019,23 @@ async function openTrip(tripId) {
   if (error || !trip) { toast('여행을 불러올 수 없어요'); return; }
   currentTrip = trip;
   $('#current-name').textContent = trip.name;
+  $('#current-meta-text').textContent = fmtDateRange(trip.start_date, trip.end_date);
   // 이전에 좌표 캐시 실패했으면 다시 시도하도록 초기화
   if (!currentTrip.dest_lat || !currentTrip.dest_lng) {
     currentTrip.dest_lat = null; currentTrip.dest_lng = null;
   }
-  $('#current-meta').textContent = fmtDateRange(trip.start_date, trip.end_date);
+  $('#current-meta-text').textContent = fmtDateRange(trip.start_date, trip.end_date);
   $('#trip-headcount').value = trip.headcount || '';
   $('#trip-theme').value = trip.theme || '';
   showScreen('screen-app');
   await upsertMyMemberInfo();
-  await Promise.all([loadMembers(), loadSavedPlaces(), loadMyLikes(), loadItinerary(), loadChecklists(), loadLinks()]);
+  await Promise.all([loadMembers(), loadSavedPlaces(), loadMyLikes(), loadItinerary(), loadChecklists(), loadLinks(), loadExpenses()]);
   renderDashboard();
   renderSaved();
   renderItinerary();
   renderChecklists();
   renderLinks();
+  renderExpenses();
   subscribeRealtime();
   // 날씨는 백그라운드 (느릴 수 있어서 await 안 함)
   loadWeather().then(() => renderItinerary());
@@ -1585,6 +1759,228 @@ $('#btn-link-save').onclick = async () => {
   toast('링크 추가됨 🔗');
 };
 
+/* ============== EXPENSES ============== */
+const EXP_CATS = {
+  flight: '✈️ 항공', hotel: '🏨 숙소', food: '🍜 식비',
+  transport: '🚌 교통', shopping: '🛍 쇼핑', activity: '🎡 액티비티', etc: '📦 기타'
+};
+let expenses = [];
+let exchangeRates = {};  // { THB: 39.5, JPY: 9.2, ... } (1 외화 → KRW)
+let activeExpenseCat = 'all';
+
+async function loadExpenses() {
+  const { data } = await sb.from('expenses').select('*')
+    .eq('trip_id', currentTrip.id)
+    .order('date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  expenses = data || [];
+}
+
+async function fetchExchangeRates() {
+  if (Object.keys(exchangeRates).length > 0) return; // 이미 캐시됨
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/KRW');
+    if (!res.ok) return;
+    const data = await res.json();
+    // data.rates는 1 KRW = X 외화 → 뒤집어서 1 외화 = X KRW
+    const rates = data.rates || {};
+    Object.entries(rates).forEach(([cur, rate]) => {
+      if (rate > 0) exchangeRates[cur] = 1 / rate;
+    });
+    exchangeRates['KRW'] = 1;
+  } catch {}
+}
+
+function toKRW(amount, currency) {
+  if (!amount || currency === 'KRW') return amount || 0;
+  const rate = exchangeRates[currency];
+  if (!rate) return null; // 환율 없으면 null
+  return Math.round(amount * rate);
+}
+
+function fmtKRW(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString() + '원';
+}
+
+function renderExpenses() {
+  const wrap = $('#expense-wrap');
+  if (!wrap) return;
+
+  const filtered = activeExpenseCat === 'all'
+    ? expenses
+    : expenses.filter(e => e.category === activeExpenseCat);
+
+  // 카테고리별 합계 (KRW 환산)
+  const totalKRW = expenses.reduce((s, e) => {
+    const krw = e.amount_krw ?? toKRW(e.amount, e.currency);
+    return s + (krw || 0);
+  }, 0);
+  const perPerson = currentTrip.headcount ? Math.round(totalKRW / currentTrip.headcount) : null;
+
+  // 카테고리별 합계
+  const catTotals = {};
+  expenses.forEach(e => {
+    const krw = e.amount_krw ?? toKRW(e.amount, e.currency) ?? 0;
+    catTotals[e.category] = (catTotals[e.category] || 0) + krw;
+  });
+  const topCat = Object.entries(catTotals).sort((a,b) => b[1]-a[1])[0];
+
+  wrap.innerHTML = `
+    <div class="expense-summary">
+      <div class="expense-summary-card">
+        <div class="expense-summary-label">💰 총 지출</div>
+        <div class="expense-summary-value">${totalKRW.toLocaleString()}<span style="font-size:12px;font-weight:500;color:var(--mute)">원</span></div>
+        <div class="expense-summary-sub">${expenses.length}건</div>
+      </div>
+      <div class="expense-summary-card">
+        <div class="expense-summary-label">👤 1인당</div>
+        <div class="expense-summary-value">${perPerson != null ? perPerson.toLocaleString() : '—'}<span style="font-size:12px;font-weight:500;color:var(--mute)">${perPerson != null ? '원' : ''}</span></div>
+        <div class="expense-summary-sub">${currentTrip.headcount ? `${currentTrip.headcount}명 기준` : '인원 미입력'}</div>
+      </div>
+      <div class="expense-summary-card">
+        <div class="expense-summary-label">📊 최다 지출</div>
+        <div class="expense-summary-value" style="font-size:15px;">${topCat ? EXP_CATS[topCat[0]] : '—'}</div>
+        <div class="expense-summary-sub">${topCat ? topCat[1].toLocaleString() + '원' : ''}</div>
+      </div>
+    </div>
+
+    <div class="cat-tabs">
+      <div class="cat-tab ${activeExpenseCat === 'all' ? 'active' : ''}" data-cat-filter="all">전체 (${expenses.length})</div>
+      ${Object.entries(EXP_CATS).filter(([k]) => expenses.some(e => e.category === k)).map(([k,v]) =>
+        `<div class="cat-tab ${activeExpenseCat === k ? 'active' : ''}" data-cat-filter="${k}">${v} (${expenses.filter(e=>e.category===k).length})</div>`
+      ).join('')}
+    </div>
+
+    ${filtered.length === 0
+      ? `<div class="expense-table"><div class="expense-empty">지출 내역이 없어요. + 지출 추가 버튼을 눌러봐 💸</div></div>`
+      : `<div class="expense-table">
+          <div class="expense-table-head">
+            <div>날짜</div><div>메모</div><div>카테고리</div><div style="text-align:right">금액</div><div style="text-align:right">원화</div><div></div>
+          </div>
+          ${filtered.map(e => {
+            const krw = e.amount_krw ?? toKRW(e.amount, e.currency);
+            return `
+              <div class="expense-row" data-id="${e.id}">
+                <div class="expense-cell mute">${e.date ? fmtDate(e.date) : '날짜 없음'}</div>
+                <div class="expense-cell">${esc(e.memo || '—')}</div>
+                <div class="expense-cell"><span class="expense-cat-badge">${EXP_CATS[e.category] || e.category}</span></div>
+                <div class="expense-cell expense-amount">${Number(e.amount).toLocaleString()} <span style="font-size:11px;font-weight:500;color:var(--mute)">${e.currency}</span></div>
+                <div class="expense-cell expense-krw">${e.currency === 'KRW' ? '' : fmtKRW(krw)}</div>
+                <div class="expense-cell"><button class="expense-del" data-del-expense="${e.id}">×</button></div>
+              </div>`;
+          }).join('')}
+        </div>`
+    }
+  `;
+
+  /* 카테고리 필터 */
+  wrap.querySelectorAll('[data-cat-filter]').forEach(tab => {
+    tab.onclick = () => {
+      activeExpenseCat = tab.dataset.catFilter;
+      renderExpenses();
+    };
+  });
+
+  /* 삭제 — 낙관적 업데이트 */
+  wrap.querySelectorAll('[data-del-expense]').forEach(b => {
+    b.onclick = async () => {
+      const id = b.dataset.delExpense;
+      expenses = expenses.filter(e => e.id !== id);
+      renderExpenses(); renderDashboard();
+      const { error } = await sb.from('expenses').delete().eq('id', id);
+      if (error) { toast(error.message); await loadExpenses(); renderExpenses(); }
+    };
+  });
+}
+
+/* 지출 추가 모달 */
+$('#btn-add-expense').onclick = async () => {
+  await fetchExchangeRates();
+  $('#ex-date').value = '';
+  $('#ex-cat').value = 'food';
+  $('#ex-amount').value = '';
+  $('#ex-currency').value = 'KRW';
+  $('#ex-memo').value = '';
+  $('#ex-krw-preview').textContent = '';
+  openModal('modal-expense');
+  setTimeout(() => $('#ex-amount').focus(), 100);
+};
+
+/* 금액/통화 변경 시 원화 환산 미리보기 */
+['ex-amount', 'ex-currency'].forEach(id => {
+  $('#' + id).addEventListener('input', () => {
+    const amount = parseFloat($('#ex-amount').value);
+    const currency = $('#ex-currency').value;
+    const preview = $('#ex-krw-preview');
+    if (!amount || currency === 'KRW') { preview.textContent = ''; return; }
+    const krw = toKRW(amount, currency);
+    preview.textContent = krw != null
+      ? `≈ ${krw.toLocaleString()}원 (실시간 환율 기준)`
+      : '환율 정보를 불러오는 중...';
+  });
+});
+
+$('#btn-expense-save').onclick = async () => {
+  const amount = parseFloat($('#ex-amount').value);
+  if (!amount || amount <= 0) { toast('금액을 입력해줘'); return; }
+  const currency = $('#ex-currency').value;
+  const category = $('#ex-cat').value;
+  const memo = $('#ex-memo').value.trim() || null;
+  const date = $('#ex-date').value || null;
+  const krw = currency === 'KRW' ? amount : toKRW(amount, currency);
+  const uid = await currentUid();
+  if (!uid) { toast('다시 로그인해주세요'); return; }
+  const { error } = await sb.from('expenses').insert({
+    trip_id: currentTrip.id, date, category, amount, currency,
+    amount_krw: krw, memo, paid_by: uid, sort_order: expenses.length
+  });
+  if (error) { toast(error.message); return; }
+  closeModal('modal-expense');
+  toast('지출 추가됨 💸');
+};
+
+/* ============== JSON 내보내기 ============== */
+$('#btn-export-json').onclick = () => {
+  const data = {
+    trip: {
+      name: currentTrip.name,
+      start_date: currentTrip.start_date,
+      end_date: currentTrip.end_date,
+      headcount: currentTrip.headcount,
+      theme: currentTrip.theme,
+      exported_at: new Date().toISOString()
+    },
+    places: savedPlaces.map(p => ({
+      name: p.name, address: p.address,
+      lat: p.lat, lng: p.lng, likes: p.likes_count
+    })),
+    itinerary: itinerary.map(it => ({
+      date: it.date, time: it.start_time,
+      place: it.places?.name || it.title,
+      notes: it.notes, cost: it.estimated_cost
+    })),
+    checklists: checklists.map(c => ({
+      category: c.category, text: c.text, checked: c.checked
+    })),
+    expenses: expenses.map(e => ({
+      date: e.date, category: e.category,
+      amount: e.amount, currency: e.currency,
+      amount_krw: e.amount_krw, memo: e.memo
+    })),
+    links: links.map(l => ({ title: l.title, url: l.url, category: l.category }))
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentTrip.name || '여로'}_${new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('플래너 내보내기 완료 📥');
+};
+
 /* ============== MAP ============== */
 function openMap() {
   $('#map-overlay').classList.add('active');
@@ -1654,12 +2050,17 @@ function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'links', filter: `trip_id=eq.${currentTrip.id}` }, async () => {
       await loadLinks(); renderLinks();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `trip_id=eq.${currentTrip.id}` }, async () => {
+      await loadExpenses(); renderExpenses(); renderDashboard();
+    })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${currentTrip.id}` }, async ({ new: newRow }) => {
-      // 인원/테마/날짜 동기화
       currentTrip = { ...currentTrip, ...newRow };
+      // 헤더 이름/날짜 갱신
+      $('#current-name').textContent = newRow.name || '';
+      $('#current-meta-text').textContent = fmtDateRange(newRow.start_date, newRow.end_date);
       if (document.activeElement?.id !== 'trip-headcount') $('#trip-headcount').value = newRow.headcount || '';
       if (document.activeElement?.id !== 'trip-theme') $('#trip-theme').value = newRow.theme || '';
-      renderDashboard();
+      renderDashboard(); renderItinerary();
     })
     .subscribe();
 }

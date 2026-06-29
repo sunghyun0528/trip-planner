@@ -1216,11 +1216,80 @@ function placeTypeToCategory(types) {
   return null;
 }
 
-/* photo reference → 이미지 URL */
+/* photo_reference → 이미지 URL 생성 (저장 시 1회만 호출 — 이후 렌더링은 저장된 URL 사용) */
 function photoRefUrl(photoRef, maxWidth = 400) {
   if (!photoRef || !IS_MAP_KEY_SET) return null;
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoRef}&key=${GOOGLE_MAPS_API_KEY}`;
 }
+/* 드롭다운 클릭 핸들러 — DB 결과와 Google 결과 분기 */
+function _bindDropdownClicks(dropdown, input, source) {
+  dropdown.querySelectorAll('.places-item').forEach(item => {
+    item.onclick = async () => {
+      const name = item.querySelector('.places-item-name').textContent;
+      input.value = name;
+      dropdown.classList.remove('active');
+      dropdown.innerHTML = '';
+
+      if (source === 'db') {
+        // ── 자체 DB → 바로 저장 (API 호출 없음) ──
+        await savePlace({
+          name,
+          address: item.dataset.address || null,
+          lat:     item.dataset.lat ? parseFloat(item.dataset.lat) : null,
+          lng:     item.dataset.lng ? parseFloat(item.dataset.lng) : null,
+          google_place_id: item.dataset.placeId || null,
+          google_rating:   item.dataset.rating ? parseFloat(item.dataset.rating) : null,
+          category:  item.dataset.category || null,
+          photo_url: item.dataset.photoUrl || null,
+          photo_ref: null,
+        });
+      } else {
+        // ── Google → 상세 조회 후 저장 + 자체 DB 자동 캐싱 ──
+        toast('장소 정보 가져오는 중...', 1500);
+        const detail = await _fetchPlaceDetail(item.dataset.placeId);
+
+        if (!detail) {
+          await savePlace({ name, address: null, lat: null, lng: null });
+          input.value = ''; return;
+        }
+
+        const lat      = detail.geometry?.location?.lat() ?? null;
+        const lng      = detail.geometry?.location?.lng() ?? null;
+        const cat      = placeTypeToCategory(detail.types);
+        const photoRef = detail.photos?.[0]?.photo_reference || null;
+        const photoUrl = photoRef ? photoRefUrl(photoRef) : null;
+        const catStr   = cat ? `${cat.emoji} ${cat.label}` : null;
+
+        await savePlace({
+          name: detail.name, address: detail.formatted_address || null,
+          lat, lng,
+          google_place_id: detail.place_id || null,
+          google_rating:   detail.rating || null,
+          category: catStr, photo_ref: photoRef, photo_url: photoUrl,
+        });
+
+        // Google에서 가져온 장소 → places_db 자동 캐싱
+        const dest = (currentTrip.destinations || [])[0] || null;
+        if (dest) {
+          sb.from('places_db').upsert({
+            name: detail.name, category: catStr,
+            country: 'TH', city: dest,
+            address: detail.formatted_address || null, lat, lng,
+            google_place_id: detail.place_id || null,
+            google_rating:   detail.rating || null,
+            review_count:    detail.user_ratings_total || null,
+            photo_url: photoUrl, photo_ref: photoRef,
+            source: 'user',
+          }, { onConflict: 'google_place_id' }).then(() => {
+            console.log('[캐시] places_db 자동 저장:', detail.name);
+          }).catch(() => {});
+        }
+      }
+      input.value = '';
+    };
+  });
+}
+
 function initSearchInput() {
   const input = $('#paste-input');
   const dropdown = $('#places-dropdown');
@@ -1261,10 +1330,51 @@ function initSearchInput() {
     _searchDebounce = setTimeout(async () => {
       showLoading();
 
-      // SDK 아직 안 로드됐으면 기다리기
+      // ── 1차: Supabase 자체 DB 검색 ──────────────────────────
+      const { data: cached, error: dbErr } = await sb
+        .rpc('search_places_db', {
+          _query: val,
+          _city: (currentTrip.destinations || [])[0] || null,
+          _limit: 6
+        });
+
+      if (!dbErr && cached && cached.length > 0) {
+        // 자체 DB 히트 → Google API 안 씀
+        dropdown.innerHTML = cached.map(p => `
+          <div class="places-item" data-from="db" data-db-id="${p.id}"
+               data-name="${esc(p.name)}" data-address="${esc(p.address || '')}"
+               data-lat="${p.lat || ''}" data-lng="${p.lng || ''}"
+               data-place-id="${p.google_place_id || ''}"
+               data-rating="${p.google_rating || ''}"
+               data-category="${esc(p.category || '')}"
+               data-photo-url="${esc(p.photo_url || '')}">
+            <div class="places-item-icon">${p.category?.split(' ')[0] || '📍'}</div>
+            <div class="places-item-info">
+              <div class="places-item-name">${esc(p.name)}</div>
+              ${p.address ? `<div class="places-item-addr">${esc(p.address.split(',').slice(0,2).join(','))}</div>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
+              ${p.google_rating ? `<span style="font-size:11px;font-weight:700;color:#2d6a4f;">⭐ ${p.google_rating}</span>` : ''}
+              <span class="places-item-badge" style="background:#e8f5e9;color:#2e7d32;">자체DB</span>
+            </div>
+          </div>`).join('');
+        dropdown.classList.add('active');
+        _bindDropdownClicks(dropdown, input, 'db');
+        return;
+      }
+
+      // ── 2차: Google Places API 폴백 ─────────────────────────
+      if (!IS_MAP_KEY_SET) {
+        dropdown.innerHTML = `<div class="places-item" style="color:var(--mute);font-size:12px;">
+          Google Maps API 키를 설정하면 더 많은 장소를 검색할 수 있어요
+        </div>`;
+        dropdown.classList.add('active');
+        return;
+      }
+
       if (!googleMapsLoaded) {
         try { await loadGoogleMapsSDK(); }
-        catch { closeDropdown(); toast('지도 서비스를 불러오지 못했어요'); return; }
+        catch { closeDropdown(); return; }
       }
 
       const predictions = await _fetchPredictions(val);
@@ -1275,53 +1385,19 @@ function initSearchInput() {
 
       dropdown.innerHTML = predictions.map(p => {
         const main = p.structured_formatting?.main_text || p.description;
-        const sub = p.structured_formatting?.secondary_text || '';
-        return `<div class="places-item" data-place-id="${p.place_id}">
+        const sub  = p.structured_formatting?.secondary_text || '';
+        return `<div class="places-item" data-from="google" data-place-id="${p.place_id}">
           <div class="places-item-icon">📍</div>
           <div class="places-item-info">
             <div class="places-item-name">${esc(main)}</div>
             ${sub ? `<div class="places-item-addr">${esc(sub)}</div>` : ''}
           </div>
+          <span class="places-item-badge badge-google">Google</span>
         </div>`;
       }).join('');
       dropdown.classList.add('active');
+      _bindDropdownClicks(dropdown, input, 'google');
 
-      // 클릭 → 상세 조회 → 포스트잇으로 저장
-      dropdown.querySelectorAll('.places-item').forEach(item => {
-        item.onclick = async () => {
-          const placeId = item.dataset.placeId;
-          const name = item.querySelector('.places-item-name').textContent;
-          input.value = name;
-          closeDropdown();
-
-          // 로딩 토스트
-          toast('장소 정보 가져오는 중...', 1500);
-          const detail = await _fetchPlaceDetail(placeId);
-
-          if (!detail) {
-            // 상세 실패해도 이름만으로 저장
-            await savePlace({ name, address: null, lat: null, lng: null });
-            input.value = '';
-            return;
-          }
-
-          const lat = detail.geometry?.location?.lat() ?? null;
-          const lng = detail.geometry?.location?.lng() ?? null;
-          const cat = placeTypeToCategory(detail.types);
-          const photoRef = detail.photos?.[0]?.photo_reference || null;
-
-          await savePlace({
-            name: detail.name,
-            address: detail.formatted_address || null,
-            lat, lng,
-            google_place_id: detail.place_id || null,
-            google_rating: detail.rating || null,
-            category: cat ? `${cat.emoji} ${cat.label}` : null,
-            photo_ref: photoRef,
-          });
-          input.value = '';
-        };
-      });
     }, 300);
   });
 
@@ -1904,6 +1980,7 @@ async function savePlace(p) {
     google_rating: p.google_rating || null,
     category: p.category || null,
     photo_ref: p.photo_ref || null,
+    photo_url: p.photo_url || null,   // 저장된 URL → 이후 렌더링 무료
     added_by: uid
   });
   if (error) { toast(error.message); return; }
@@ -1956,7 +2033,8 @@ function renderSaved() {
     const likes = p.likes_count || 0;
     const sub = p.address ? p.address.split(',').slice(0,2).join(',') : '';
     const rating = p.google_rating ? `⭐ ${p.google_rating}` : '';
-    const photoUrl = p.photo_ref ? photoRefUrl(p.photo_ref) : null;
+    // photo_url은 저장 시 1회 생성된 URL → 렌더링 시 API 호출 없음
+    const photoUrl = p.photo_url || null;
     return `
       <div class="postit-card postit-bg-${bg}" data-id="${p.id}">
         ${photoUrl ? `<img class="postit-photo" src="${photoUrl}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()" />` : ''}

@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Google Maps는 JS에서 동적 로드 (API 키 필요) -->
 
 <style>
   :root {
@@ -25,6 +25,12 @@
     --p4-bg: #DCEFE3; --p4-tx: #3f6f50;
     --p5-bg: #E9DEED; --p5-tx: #6a4b7a;
     --p6-bg: #F1ECE3; --p6-tx: #6b5d3e;
+    --p7-bg: #D6EAF8; --p7-tx: #1a5276;
+    --p8-bg: #FDEBD0; --p8-tx: #935116;
+    --p9-bg: #E8F8F5; --p9-tx: #1a7a64;
+    --p10-bg: #FEF9E7; --p10-tx: #7d6608;
+    --p11-bg: #F9EBF8; --p11-tx: #76448a;
+    --p12-bg: #EAFAF1; --p12-tx: #1e8449;
     --r: 6px; --r-l: 10px;
     --shadow: 0 1px 2px rgba(0,0,0,0.04);
     --shadow-l: 0 8px 24px rgba(0,0,0,0.08);
@@ -118,7 +124,22 @@
 
   .map-overlay { display: none; position: fixed; inset: 53px 0 0 340px; background: var(--surface); z-index: 50; flex-direction: column; }
   .map-overlay.active { display: flex; }
-  .map-overlay-head { padding: 12px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .map-overlay-head { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  /* Day 필터 버튼 — 지도 위 절대 위치 */
+  .map-day-filter {
+    position: absolute; top: 12px; right: 12px; z-index: 100;
+    display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+  }
+  .map-day-btn {
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    transition: all .15s; background: var(--surface); color: var(--ink);
+    white-space: nowrap;
+  }
+  .map-day-btn:hover { transform: translateX(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.22); }
+  .map-day-btn.active { color: #fff; border-color: transparent; }
+  .map-day-btn.all { background: var(--ink); color: #fff; }
   #map { flex: 1; width: 100%; background: var(--line); }
 
   .panel-header { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: var(--surface); }
@@ -141,12 +162,18 @@
   .postit-list { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
   .postit-card { border-radius: 8px; padding: 12px 14px; box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03); position: relative; transition: transform .15s, box-shadow .15s; }
   .postit-card:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 8px 16px rgba(0,0,0,0.06); }
-  .postit-bg-1 { background: var(--p1-bg); color: var(--p1-tx); }
-  .postit-bg-2 { background: var(--p2-bg); color: var(--p2-tx); }
-  .postit-bg-3 { background: var(--p3-bg); color: var(--p3-tx); }
-  .postit-bg-4 { background: var(--p4-bg); color: var(--p4-tx); }
-  .postit-bg-5 { background: var(--p5-bg); color: var(--p5-tx); }
-  .postit-bg-6 { background: var(--p6-bg); color: var(--p6-tx); }
+  .postit-bg-1  { background: var(--p1-bg);  color: var(--p1-tx);  }
+  .postit-bg-2  { background: var(--p2-bg);  color: var(--p2-tx);  }
+  .postit-bg-3  { background: var(--p3-bg);  color: var(--p3-tx);  }
+  .postit-bg-4  { background: var(--p4-bg);  color: var(--p4-tx);  }
+  .postit-bg-5  { background: var(--p5-bg);  color: var(--p5-tx);  }
+  .postit-bg-6  { background: var(--p6-bg);  color: var(--p6-tx);  }
+  .postit-bg-7  { background: var(--p7-bg);  color: var(--p7-tx);  }
+  .postit-bg-8  { background: var(--p8-bg);  color: var(--p8-tx);  }
+  .postit-bg-9  { background: var(--p9-bg);  color: var(--p9-tx);  }
+  .postit-bg-10 { background: var(--p10-bg); color: var(--p10-tx); }
+  .postit-bg-11 { background: var(--p11-bg); color: var(--p11-tx); }
+  .postit-bg-12 { background: var(--p12-bg); color: var(--p12-tx); }
   .postit-name { font-size: 15px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; overflow-wrap: anywhere; }
   .postit-meta { font-size: 11.5px; opacity: 0.78; font-weight: 500; overflow-wrap: anywhere; }
   .postit-by { margin-top: 8px; font-size: 11px; font-weight: 600; opacity: 0.7; display: flex; align-items: center; gap: 4px; }
@@ -544,8 +571,16 @@
   .cat-tab:hover:not(.active) { border-color: var(--ink); color: var(--ink); }
 
   /* 지도 */
-  .leaflet-popup-content { font-family: inherit; font-size: 13px; font-weight: 500; }
-  .leaflet-popup-content img { border-radius: 4px; margin-bottom: 6px; max-width: 180px; }
+  /* Google Maps 커스텀 팝업 */
+  .gm-popup {
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    min-width: 160px; max-width: 220px; line-height: 1.5;
+  }
+  .gm-popup-name { font-size: 14px; font-weight: 700; color: #37352F; margin-bottom: 4px; }
+  .gm-popup-addr { font-size: 12px; color: #787774; margin-bottom: 8px; }
+  .gm-popup-links { display: flex; gap: 8px; }
+  .gm-popup-links a { font-size: 11px; font-weight: 600; color: #FF7A6B; text-decoration: none; }
+  .gm-popup-links a:hover { text-decoration: underline; }
 
   /* 모달 */
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
@@ -735,7 +770,13 @@
         </div>
         <button class="btn btn-ghost" id="btn-map-close">닫기 ×</button>
       </div>
-      <div id="map"></div>
+      <!-- 지도 + Day 버튼 오버레이를 relative로 감싸기 -->
+      <div style="position:relative;flex:1;min-height:0;">
+        <div id="map" style="width:100%;height:100%;"></div>
+        <div class="map-day-filter" id="map-day-filter">
+          <!-- JS로 렌더 -->
+        </div>
+      </div>
     </div>
 
     <div class="mobile-toggle">
@@ -903,7 +944,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet 제거됨 → Google Maps JS API 사용 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* =====================================================================
@@ -934,7 +975,15 @@ let weatherState = 'none';    // per destination
 let weatherByDest = {};       // { "방콕": { state, byDate: {} } }
 let selectedWeatherDay = null;
 let selectedWeatherDest = null; // 현재 선택된 여행지
-let map = null, mapMarkers = [], mapInited = false;
+let map = null;           // google.maps.Map 인스턴스
+let mapMarkers = [];      // google.maps.Marker 배열
+let mapInfoWindow = null; // google.maps.InfoWindow (단일 공유)
+let mapInited = false;
+let polylines = [];       // google.maps.Polyline 배열
+let googleMapsLoaded = false;
+
+/* Google Maps API 키 — 발급 후 아래에 입력 */
+const GOOGLE_MAPS_API_KEY = 'GMAPS_KEY_PLACEHOLDER';
 let realtimeChannel = null;
 let pendingAddPlace = null;
 let collapsedDays = new Set();
@@ -969,10 +1018,7 @@ function avatarColor(id) {
   let h = 0; for (const c of String(id||'')) h = ((h<<5)-h+c.charCodeAt(0))>>>0;
   return colors[h % colors.length];
 }
-function postitBgIndex(id) {
-  let h = 0; for (const c of String(id||'')) h = ((h<<5)-h+c.charCodeAt(0))>>>0;
-  return (h % 6) + 1;
-}
+const POSTIT_COLORS = 12; // 총 색상 수
 async function currentUid() {
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) { user = session.user; return session.user.id; }
@@ -1064,7 +1110,7 @@ async function loadWeather() {
     const coords = await geocodeDest(name);
     if (!coords) return { name, state: 'no-coords', byDate: {} };
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${currentTrip.start_date}&end_date=${currentTrip.end_date}`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&start_date=${currentTrip.start_date}&end_date=${currentTrip.end_date}`;
       const res = await fetch(url);
       if (!res.ok) return { name, state: 'error', byDate: {} };
       const data = await res.json();
@@ -1073,7 +1119,9 @@ async function loadWeather() {
         byDate[d] = {
           code: data.daily.weather_code[i],
           max: data.daily.temperature_2m_max[i],
-          min: data.daily.temperature_2m_min[i]
+          min: data.daily.temperature_2m_min[i],
+          precip: data.daily.precipitation_sum?.[i] ?? null,
+          wind: data.daily.wind_speed_10m_max?.[i] ?? null,
         };
       });
       return { name, state: 'loaded', byDate };
@@ -1206,6 +1254,8 @@ function renderWeatherCard() {
         <div class="weather-stat"><div class="weather-stat-label">Day</div><div class="weather-stat-value">${selDayIdx + 1} / ${days.length}</div></div>
         <div class="weather-stat"><div class="weather-stat-label">최고기온</div><div class="weather-stat-value">${Math.round(sel.max)}°C</div></div>
         <div class="weather-stat"><div class="weather-stat-label">최저기온</div><div class="weather-stat-value">${Math.round(sel.min)}°C</div></div>
+        ${sel.precip != null ? `<div class="weather-stat"><div class="weather-stat-label">강수량</div><div class="weather-stat-value">${sel.precip.toFixed(1)}mm</div></div>` : ''}
+        ${sel.wind != null ? `<div class="weather-stat"><div class="weather-stat-label">최대풍속</div><div class="weather-stat-value">${Math.round(sel.wind)}km/h</div></div>` : ''}
       </div>
     </div>
   </div>`;
@@ -1253,7 +1303,8 @@ $('#btn-google').onclick = async () => {
 
 $('#btn-logout').onclick = async () => {
   if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-  if (map) { map.remove(); map = null; mapMarkers = []; mapInited = false; }
+  if (map) { mapMarkers.forEach(m => m.setMap(null)); mapMarkers = []; map = null; mapInited = false; }
+  mapInfoWindow = null;
   await sb.auth.signOut();
 };
 
@@ -1374,7 +1425,7 @@ async function openTrip(tripId) {
   $('#trip-destinations').value = (trip.destinations || []).join(', ');
   showScreen('screen-app');
   await upsertMyMemberInfo();
-  await Promise.all([loadMembers(), loadSavedPlaces(), loadMyLikes(), loadItinerary(), loadChecklists(), loadLinks(), loadExpenses()]);
+  await Promise.all([loadMembers(), loadSavedPlaces(), loadMyLikes(), loadItinerary(), loadChecklists(), loadLinks(), loadExpenses(), fetchExchangeRates()]);
   renderDashboard();
   renderSaved();
   renderItinerary();
@@ -1395,7 +1446,8 @@ async function upsertMyMemberInfo() {
 
 $('#btn-back').onclick = async () => {
   if (realtimeChannel) { await sb.removeChannel(realtimeChannel); realtimeChannel = null; }
-  if (map) { map.remove(); map = null; mapMarkers = []; mapInited = false; }
+  if (map) { mapMarkers.forEach(m => m.setMap(null)); mapMarkers = []; map = null; mapInited = false; }
+  mapInfoWindow = null;
   $('#map-overlay').classList.remove('active');
   currentTrip = null;
   $('#paste-input').value = '';
@@ -1554,8 +1606,8 @@ function renderSaved() {
     list.innerHTML = '<div class="empty empty-sm">위에 지도 링크를 붙여넣으면<br/>여기에 포스트잇처럼 쌓여요 📝</div>';
     return;
   }
-  list.innerHTML = `<div class="postit-list">${savedPlaces.map(p => {
-    const bg = postitBgIndex(p.id);
+  list.innerHTML = `<div class="postit-list">${savedPlaces.map((p, idx) => {
+    const bg = (idx % POSTIT_COLORS) + 1;
     const recommender = nameOf(p.added_by);
     const liked = myLikes.has(p.id);
     const likes = p.likes_count || 0;
@@ -1660,8 +1712,14 @@ function renderTripTags() {
   if (!tagsEl) return;
   const dests = currentTrip.destinations || [];
   const headcount = currentTrip.headcount;
-  const totalCost = itinerary.reduce((s, it) => s + (it.estimated_cost || 0), 0);
-  const perPerson = headcount ? Math.round(totalCost / headcount) : null;
+  // expenses 기반 총액 (환율 적용), 없으면 itinerary 비용 폴백
+  const expTotal = expenses.reduce((s, e) => {
+    const krw = e.amount_krw ?? toKRW(e.amount, e.currency) ?? 0;
+    return s + krw;
+  }, 0);
+  const itinTotal = itinerary.reduce((s, it) => s + (it.estimated_cost || 0), 0);
+  const totalCost = expTotal > 0 ? expTotal : itinTotal;
+  const perPerson = headcount && totalCost > 0 ? Math.round(totalCost / headcount) : null;
 
   tagsEl.innerHTML = [
     // 여행지 태그들
@@ -2480,50 +2538,289 @@ $('#btn-export-json').onclick = () => {
 };
 
 /* ============== MAP ============== */
+/* ============== GOOGLE MAPS ============== */
+
+/* Google Maps SDK 동적 로드 (한 번만) */
+function loadGoogleMapsSDK() {
+  return new Promise((resolve, reject) => {
+    if (googleMapsLoaded) { resolve(); return; }
+    if (GOOGLE_MAPS_API_KEY === 'GMAPS_KEY_PLACEHOLDER') {
+      reject(new Error('NO_API_KEY')); return;
+    }
+    // 콜백 함수 전역 등록
+    window.__gmapsReady = () => { googleMapsLoaded = true; resolve(); };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=__gmapsReady&libraries=places`;
+    s.async = true; s.defer = true;
+    s.onerror = () => reject(new Error('LOAD_FAILED'));
+    document.head.appendChild(s);
+  });
+}
+
 function openMap() {
   $('#map-overlay').classList.add('active');
-  if (!mapInited) ensureMap(); else setTimeout(() => map?.invalidateSize(), 50);
+  if (!mapInited) {
+    ensureMap();
+  } else {
+    renderMapDayFilter();
+    renderMarkers();
+  }
 }
 $('#btn-map-toggle').onclick = openMap;
 $('#btn-map-close').onclick = () => $('#map-overlay').classList.remove('active');
 
-function ensureMap() {
+async function ensureMap() {
   if (mapInited) return;
-  setTimeout(() => {
-    const el = document.getElementById('map'); if (!el) return;
-    const center = currentTrip.dest_lat ? [currentTrip.dest_lat, currentTrip.dest_lng] : [20, 100];
-    const zoom = currentTrip.dest_lat ? 11 : 2;
-    map = L.map(el, { zoomControl: true }).setView(center, zoom);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd'
-    }).addTo(map);
-    mapInited = true;
-    renderMarkers();
-  }, 80);
+  const el = document.getElementById('map');
+  if (!el) return;
+
+  // API 키 미설정 시 안내
+  if (GOOGLE_MAPS_API_KEY === 'GMAPS_KEY_PLACEHOLDER') {
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:24px;text-align:center;">
+        <div style="font-size:32px;">🗺</div>
+        <div style="font-size:14px;font-weight:700;color:var(--ink);">Google Maps API 키가 필요해요</div>
+        <div style="font-size:12.5px;color:var(--mute);line-height:1.6;">
+          Google Cloud Console에서 Maps JavaScript API 키를 발급하고<br/>
+          index.html의 <code>GOOGLE_MAPS_API_KEY</code>에 입력해주세요.
+        </div>
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
+           style="font-size:12px;font-weight:600;color:var(--accent);">
+          → Google Cloud Console 열기
+        </a>
+      </div>`;
+    return;
+  }
+
+  try {
+    await loadGoogleMapsSDK();
+  } catch (e) {
+    el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mute);font-size:13px;">지도를 불러오지 못했어요. 네트워크 또는 API 키를 확인해주세요.</div>`;
+    return;
+  }
+
+  // 초기 중심: destinations 첫 번째 좌표 or 여행지 기본값
+  const dests = Object.values(currentTrip.dest_coords || {});
+  const center = dests.length > 0
+    ? { lat: dests[0].lat, lng: dests[0].lng }
+    : { lat: 13.7563, lng: 100.5018 }; // 방콕 기본값
+
+  map = new google.maps.Map(el, {
+    center,
+    zoom: 12,
+    mapId: 'mongsil_map',
+    disableDefaultUI: false,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true,
+    gestureHandling: 'greedy',
+    styles: [
+      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+    ]
+  });
+
+  mapInfoWindow = new google.maps.InfoWindow();
+  mapInited = true;
+  selectedMapDay = null; // 지도 열 때마다 전체보기로 초기화
+  renderMapDayFilter();
+  renderMarkers();
+}
+
+// 현재 선택된 Day (null = 전체보기)
+let selectedMapDay = null;
+
+// Day별 파스텔 색상
+const DAY_COLORS = [
+  '#F9A8A0','#93C5CC','#A8D5A2','#C5B4E3',
+  '#F4C06F','#82B9E8','#F0A0C0','#A0D4A0',
+  '#D4B4E8','#F4D080','#88C8D8','#C8D8A0'
+];
+
+function renderMapDayFilter() {
+  const container = $('#map-day-filter');
+  if (!container || !currentTrip.start_date || !currentTrip.end_date) return;
+
+  const days = daysBetween(currentTrip.start_date, currentTrip.end_date);
+
+  // Day별 일정 있는 날짜만 필터
+  const daysWithItems = days.filter((d, i) =>
+    itinerary.some(it => it.date === d && savedPlaces.find(p => p.id === it.place_id && p.lat != null))
+  );
+
+  container.innerHTML = `
+    <button class="map-day-btn all ${selectedMapDay === null ? 'active' : ''}" data-map-day="all">
+      전체 보기
+    </button>
+    ${daysWithItems.map((d, i) => {
+      const dayIdx = days.indexOf(d);
+      const color = DAY_COLORS[dayIdx % DAY_COLORS.length];
+      const isActive = selectedMapDay === d;
+      return `<button class="map-day-btn ${isActive ? 'active' : ''}"
+        data-map-day="${d}"
+        style="background:${isActive ? color : 'var(--surface)'};color:${isActive ? '#fff' : 'var(--ink)'};">
+        Day ${dayIdx + 1} · ${fmtDate(d)}
+      </button>`;
+    }).join('')}
+  `;
+
+  container.querySelectorAll('.map-day-btn').forEach(btn => {
+    btn.onclick = () => {
+      selectedMapDay = btn.dataset.mapDay === 'all' ? null : btn.dataset.mapDay;
+      renderMapDayFilter();
+      renderMarkers();
+    };
+  });
 }
 
 function renderMarkers() {
-  if (!map) return;
-  mapMarkers.forEach(m => m.remove()); mapMarkers = [];
-  const pts = [];
-  savedPlaces.forEach(p => {
-    if (p.lat == null || p.lng == null) return;
-    const popup = `<b>${esc(p.name)}</b><br/><span style="color:#787774">${esc(p.address || '')}</span><br/>
-      <div style="margin-top:6px;display:flex;gap:4px;">
-        <a href="${googleMapsLink(p)}" target="_blank" style="color:#FF7A6B;font-size:11px;font-weight:600">구글맵</a> ·
-        <a href="${naverMapsLink(p)}" target="_blank" style="color:#FF7A6B;font-size:11px;font-weight:600">네이버맵</a>
-      </div>`;
-    const m = L.marker([p.lat, p.lng]).addTo(map);
-    m._placeId = p.id;
-    m.bindPopup(popup, { maxWidth: 220 });
-    mapMarkers.push(m); pts.push([p.lat, p.lng]);
-  });
+  if (!map || !window.google) return;
+
+  // 기존 마커 + 폴리라인 제거
+  mapMarkers.forEach(m => m.setMap(null));
+  mapMarkers = [];
+  polylines.forEach(pl => pl.setMap(null));
+  polylines = [];
+
+  if (!mapInfoWindow) mapInfoWindow = new google.maps.InfoWindow();
+
+  const bounds = new google.maps.LatLngBounds();
+  let hasPoints = false;
+
+  if (selectedMapDay === null) {
+    // ── 전체보기: 저장된 장소 전부 표시 ──
+    savedPlaces.forEach((p, idx) => {
+      if (p.lat == null || p.lng == null) return;
+      _addMarker(p, idx + 1, DAY_COLORS[idx % DAY_COLORS.length], bounds);
+      hasPoints = true;
+    });
+    _drawAllPolylines();
+  } else {
+    // ── Day 선택: 해당 day 일정 장소만 순서대로 표시 ──
+    const days = currentTrip.start_date && currentTrip.end_date
+      ? daysBetween(currentTrip.start_date, currentTrip.end_date) : [];
+    const dayIdx = days.indexOf(selectedMapDay);
+    const color = DAY_COLORS[dayIdx % DAY_COLORS.length];
+
+    const dayItems = itinerary
+      .filter(it => it.date === selectedMapDay)
+      .sort((a, b) => (a.start_time || '99:99') < (b.start_time || '99:99') ? -1 : 1);
+
+    const pathCoords = [];
+    dayItems.forEach((it, orderIdx) => {
+      const place = savedPlaces.find(p => p.id === it.place_id);
+      if (!place || place.lat == null) return;
+      _addMarker(place, orderIdx + 1, color, bounds);
+      pathCoords.push({ lat: place.lat, lng: place.lng });
+      hasPoints = true;
+    });
+
+    // 해당 Day 동선만 폴리라인
+    if (pathCoords.length >= 2) {
+      const pl = new google.maps.Polyline({
+        path: pathCoords,
+        geodesic: true,
+        strokeColor: color,
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+        icons: [{
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 3.5, strokeWeight: 1.5, fillOpacity: 1
+          },
+          offset: '50%', repeat: '80px'
+        }]
+      });
+      pl.setMap(map);
+      polylines.push(pl);
+    }
+  }
+
   const status = $('#map-status');
-  if (pts.length > 0) {
-    map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
-    if (status) status.textContent = `${pts.length}개 장소`;
-  } else if (status) status.textContent = '저장한 장소 중 좌표가 있는 것이 없어요';
+  if (hasPoints) {
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { top: 60, right: 180, bottom: 60, left: 60 });
+    }
+    if (status) status.textContent = selectedMapDay
+      ? `Day ${daysBetween(currentTrip.start_date, currentTrip.end_date).indexOf(selectedMapDay) + 1} · ${mapMarkers.length}개 장소`
+      : `전체 ${mapMarkers.length}개 장소`;
+  } else {
+    if (status) status.textContent = '이 날의 일정에 좌표가 있는 장소가 없어요';
+  }
 }
+
+/* 단일 마커 추가 헬퍼 */
+function _addMarker(place, num, color, bounds) {
+  const pos = { lat: place.lat, lng: place.lng };
+  bounds.extend(pos);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.25"/></filter>
+    <path d="M18 2C10.268 2 4 8.268 4 16c0 10.5 14 28 14 28S32 26.5 32 16C32 8.268 25.732 2 18 2z"
+          fill="${color}" stroke="white" stroke-width="2" filter="url(#sh)"/>
+    <circle cx="18" cy="16" r="9" fill="rgba(255,255,255,0.3)"/>
+    <text x="18" y="21" text-anchor="middle"
+          font-family="system-ui,-apple-system,sans-serif"
+          font-size="${num > 9 ? '10' : '12'}" font-weight="800" fill="white">${num}</text>
+  </svg>`;
+
+  const marker = new google.maps.Marker({
+    position: pos,
+    map,
+    icon: {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+      scaledSize: new google.maps.Size(36, 46),
+      anchor: new google.maps.Point(18, 46),
+    },
+    title: place.name,
+    zIndex: num,
+  });
+
+  const popupHtml = `
+    <div class="gm-popup">
+      <div class="gm-popup-name">${esc(place.name)}</div>
+      ${place.address ? `<div class="gm-popup-addr">${esc(place.address)}</div>` : ''}
+      <div class="gm-popup-links">
+        <a href="${googleMapsLink(place)}" target="_blank">구글맵 ↗</a>
+        <a href="${naverMapsLink(place)}" target="_blank">네이버맵 ↗</a>
+      </div>
+    </div>`;
+
+  marker.addListener('click', () => {
+    mapInfoWindow.setContent(popupHtml);
+    mapInfoWindow.open(map, marker);
+  });
+  marker._placeId = place.id;
+  mapMarkers.push(marker);
+}
+
+/* 전체보기용 Day별 폴리라인 */
+function _drawAllPolylines() {
+  if (!currentTrip.start_date || !currentTrip.end_date) return;
+  const days = daysBetween(currentTrip.start_date, currentTrip.end_date);
+  days.forEach((d, di) => {
+    const dayItems = itinerary
+      .filter(it => it.date === d)
+      .sort((a, b) => (a.start_time || '99:99') < (b.start_time || '99:99') ? -1 : 1);
+    const path = dayItems
+      .map(it => { const p = savedPlaces.find(s => s.id === it.place_id); return p?.lat != null ? { lat: p.lat, lng: p.lng } : null; })
+      .filter(Boolean);
+    if (path.length < 2) return;
+    const pl = new google.maps.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: DAY_COLORS[di % DAY_COLORS.length],
+      strokeOpacity: 0.6,
+      strokeWeight: 3,
+      icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, strokeWeight: 1 }, offset: '50%', repeat: '100px' }]
+    });
+    pl.setMap(map);
+    polylines.push(pl);
+  });
+}
+
+/* 기존 drawItineraryPolylines는 renderMarkers 안에 통합됨 */
+function drawItineraryPolylines() { if (mapInited) renderMarkers(); }
 
 /* ============== REALTIME ============== */
 function subscribeRealtime() {
@@ -2535,6 +2832,7 @@ function subscribeRealtime() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'itinerary_items', filter: `trip_id=eq.${currentTrip.id}` }, async () => {
       await loadItinerary(); renderItinerary(); renderDashboard();
+      if (mapInited) drawItineraryPolylines(); // 동선 갱신
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_members', filter: `trip_id=eq.${currentTrip.id}` }, async () => {
       await loadMembers(); renderSaved();

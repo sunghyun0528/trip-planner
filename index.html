@@ -1041,38 +1041,39 @@ async function trackApiCall(apiName) {
   const today = new Date().toISOString().split('T')[0];
   const key = `${apiName}:${today}`;
 
-  // 로컬 캐시 먼저 확인 (매 호출마다 Supabase 안 부름)
-  if (_usageCache[key] == null) {
-    const { data } = await sb.from('api_usage')
-      .select('count').eq('api', apiName).eq('date', today).maybeSingle();
-    _usageCache[key] = data?.count || 0;
+  try {
+    if (_usageCache[key] == null) {
+      const { data } = await sb.from('api_usage')
+        .select('count').eq('api', apiName).eq('date', today).maybeSingle();
+      _usageCache[key] = data?.count || 0;
+    }
+
+    const current = _usageCache[key];
+    const limit = API_LIMITS[apiName];
+    if (!limit) return true;
+
+    if (current >= limit.daily) {
+      console.warn(`🚨 [${apiName}] 일일 한도 초과 (${current}/${limit.daily})`);
+      _showApiWarning(`${apiName} 오늘 한도(${limit.daily}회)를 초과했어요. 내일 초기화됩니다.`);
+      return false;
+    }
+
+    if (current >= limit.warn) {
+      _showApiWarning(`오늘 장소 검색을 ${current}회 사용했어요 (한도: ${limit.daily}회)`);
+    }
+
+    _usageCache[key] = current + 1;
+    sb.from('api_usage').upsert(
+      { api: apiName, date: today, count: current + 1, updated_at: new Date().toISOString() },
+      { onConflict: 'api,date' }
+    ).catch(() => {}); // 실패해도 검색은 허용
+
+  } catch (e) {
+    // api_usage 테이블 없거나 DB 오류 시 → 검색은 허용 (차단 안 함)
+    console.warn('[trackApiCall] DB 오류, 카운트 스킵:', e.message);
   }
 
-  const current = _usageCache[key];
-  const limit = API_LIMITS[apiName];
-  if (!limit) return true;
-
-  // 한도 초과 → 차단
-  if (current >= limit.daily) {
-    console.warn(`🚨 [${apiName}] 일일 한도 초과 (${current}/${limit.daily})`);
-    _showApiWarning(`${apiName} 오늘 한도(${limit.daily}회)를 초과했어요. 내일 초기화됩니다.`);
-    return false; // 호출 차단
-  }
-
-  // 경고 구간
-  if (current >= limit.warn) {
-    console.warn(`⚠️ [${apiName}] 한도 근접 (${current}/${limit.daily})`);
-    _showApiWarning(`오늘 장소 검색을 ${current}회 사용했어요 (한도: ${limit.daily}회)`);
-  }
-
-  // 카운터 증가 (비동기, 차단 안 함)
-  _usageCache[key] = current + 1;
-  sb.from('api_usage').upsert(
-    { api: apiName, date: today, count: current + 1, updated_at: new Date().toISOString() },
-    { onConflict: 'api,date' }
-  ).then(() => {}).catch(() => {});
-
-  return true; // 호출 허용
+  return true; // 항상 허용 (DB 오류가 검색을 막으면 안 됨)
 }
 
 function _showApiWarning(msg) {
@@ -1136,10 +1137,15 @@ async function _fetchPredictions(query) {
     _autocompleteService.getPlacePredictions({
       input: query,
       sessionToken: _sessionToken,
-      // 여행 관련 장소 타입 우선
-      types: ['establishment', 'tourist_attraction', 'food', 'lodging'],
+      // establishment: 음식점·관광지·숙소 등 모든 장소 포함
+      // types는 1개만 허용 (복수 지정 시 INVALID_REQUEST)
+      types: ['establishment'],
     }, (predictions, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+        resolve([]); return;
+      }
       if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+        console.warn('[Places]', status);
         resolve([]); return;
       }
       resolve(predictions.slice(0, 5));

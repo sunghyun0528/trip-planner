@@ -1019,6 +1019,8 @@ let googleMapsLoaded = false;
 
 /* Google Maps API 키 */
 const GOOGLE_MAPS_API_KEY = 'GMAPS_KEY_PLACEHOLDER';
+// 실제 Google API 키는 39자 (AIzaSy로 시작), 플레이스홀더는 21자
+const IS_MAP_KEY_SET = GOOGLE_MAPS_API_KEY.length > 30;
 
 /* ============================================================
    API 사용량 추적 + 한도 차단 레이어
@@ -1193,7 +1195,7 @@ function initSearchInput() {
     if (val.length < 2) { closeDropdown(); return; }
 
     // Google Maps SDK 로드 안 됐으면 스킵
-    if (!window.google || GOOGLE_MAPS_API_KEY === 'GMAPS_KEY_PLACEHOLDER') return;
+    if (!window.google || !IS_MAP_KEY_SET) return;
 
     // 디바운스 300ms — 타이핑 멈출 때만 API 호출
     clearTimeout(_searchDebounce);
@@ -2828,7 +2830,7 @@ $('#btn-export-json').onclick = () => {
 function loadGoogleMapsSDK() {
   return new Promise((resolve, reject) => {
     if (googleMapsLoaded) { resolve(); return; }
-    if (GOOGLE_MAPS_API_KEY === 'GMAPS_KEY_PLACEHOLDER') {
+    if (!IS_MAP_KEY_SET) {
       reject(new Error('NO_API_KEY')); return;
     }
     // 콜백 함수 전역 등록
@@ -2859,7 +2861,7 @@ async function ensureMap() {
   if (!el) return;
 
   // API 키 미설정 시 안내
-  if (GOOGLE_MAPS_API_KEY === 'GMAPS_KEY_PLACEHOLDER') {
+  if (!IS_MAP_KEY_SET) {
     el.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:24px;text-align:center;">
         <div style="font-size:32px;">🗺</div>

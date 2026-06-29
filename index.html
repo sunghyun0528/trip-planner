@@ -158,34 +158,129 @@
   .postit-x { position: absolute; top: 8px; right: 8px; font-size: 14px; opacity: 0.4; padding: 4px; line-height: 1; border-radius: 4px; }
   .postit-x:hover { opacity: 1; background: rgba(0,0,0,0.06); }
 
+  /* ===== 여행 헤더 카드 (새 디자인) ===== */
+  .trip-header-card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-l); padding: 20px 22px 16px; margin-bottom: 14px;
+  }
+  .thc-title-row {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px;
+  }
+  .thc-title {
+    font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400;
+    letter-spacing: -0.02em; color: var(--ink); line-height: 1.1;
+  }
+  .thc-edit-btn {
+    font-size: 11.5px; font-weight: 600; color: var(--mute); padding: 3px 8px;
+    border: 1px solid var(--line-2); border-radius: 4px; transition: all .15s; flex-shrink: 0;
+  }
+  .thc-edit-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .thc-period-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    font-size: 13px; color: var(--ink-soft); font-weight: 500;
+  }
+  .thc-dday {
+    display: inline-flex; align-items: center; padding: 2px 10px;
+    background: var(--coral-soft); color: var(--coral-deep);
+    border-radius: 999px; font-size: 12px; font-weight: 700;
+  }
+  .thc-tags-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .thc-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--line-2); background: var(--bg);
+    font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+    cursor: pointer; transition: all .15s;
+  }
+  .thc-tag:hover { border-color: var(--ink); color: var(--ink); }
+  .thc-tag-add {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 10px; border-radius: 999px;
+    border: 1px dashed var(--line-2);
+    font-size: 12px; font-weight: 600; color: var(--mute-2);
+    cursor: pointer; transition: all .15s;
+  }
+  .thc-tag-add:hover { border-color: var(--coral); color: var(--coral); }
+  .thc-tag-input {
+    padding: 4px 10px; border: 1px solid var(--coral); border-radius: 999px;
+    font-size: 12px; font-weight: 600; color: var(--ink); background: var(--surface);
+    outline: none; width: 100px;
+  }
+
+  /* ===== 일정 아이템 카드 (새 디자인) ===== */
+  .itin-card {
+    display: flex; gap: 14px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-l); margin-bottom: 10px;
+    align-items: flex-start; transition: box-shadow .15s;
+  }
+  .itin-card:hover { box-shadow: var(--shadow-l); }
+  .itin-card-num {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; margin-top: 2px;
+  }
+  /* 파스텔 순환 (1~6) */
+  .nc-1 { background: #F9A8A0; } .nc-2 { background: #93C5CC; }
+  .nc-3 { background: #A8D5A2; } .nc-4 { background: #C5B4E3; }
+  .nc-5 { background: #F4C06F; } .nc-6 { background: #82B9E8; }
+  .itin-card-left { flex-shrink: 0; text-align: center; min-width: 52px; }
+  .itin-card-time { font-size: 12px; color: var(--mute); font-weight: 600; margin-top: 6px; }
+  .itin-card-body { flex: 1; min-width: 0; }
+  .itin-card-name {
+    font-size: 15px; font-weight: 700; color: var(--ink);
+    margin-bottom: 3px; overflow-wrap: anywhere;
+  }
+  .itin-card-name-input {
+    font-size: 15px; font-weight: 700; color: var(--ink);
+    border: 1px solid transparent; border-radius: 4px; padding: 2px 4px;
+    background: transparent; width: 100%;
+  }
+  .itin-card-name-input:hover { border-color: var(--line-2); }
+  .itin-card-name-input:focus { outline: none; border-color: var(--coral); background: var(--bg); }
+  .itin-card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+  .itin-card-cat {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: var(--line); color: var(--mute);
+  }
+  .itin-card-addr { font-size: 12px; color: var(--mute); font-weight: 500; }
+  .itin-card-memo {
+    width: 100%; padding: 5px 6px; border: 1px solid transparent; border-radius: 4px;
+    font-size: 12.5px; color: var(--mute); background: transparent;
+    resize: none; font-family: inherit; min-height: 20px; font-weight: 500;
+  }
+  .itin-card-memo:hover { border-color: var(--line-2); background: var(--bg); }
+  .itin-card-memo:focus { outline: none; border-color: var(--coral); background: var(--surface); color: var(--ink); }
+  .itin-card-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .itin-card-cost-display {
+    font-size: 14px; font-weight: 700; color: var(--ink); cursor: text;
+    padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; text-align: right;
+  }
+  .itin-card-cost-display:hover { border-color: var(--line-2); }
+  .itin-card-cost-display.no-cost { color: var(--mute-2); font-size: 12px; font-weight: 500; }
+  .itin-card-cost-input {
+    width: 90px; padding: 4px 8px; border: 1px solid var(--coral); border-radius: 4px;
+    font-size: 13px; font-weight: 700; text-align: right; background: var(--surface);
+    display: none; outline: none;
+  }
+  .itin-card-cost-input.editing { display: block; }
+  .itin-card-cost-display.editing { display: none; }
+  .itin-card-del {
+    color: var(--mute-2); font-size: 16px; padding: 2px 6px; border-radius: 4px; line-height: 1;
+  }
+  .itin-card-del:hover { color: var(--error); background: rgba(178,58,58,0.08); }
+  .itin-card-time-sel select {
+    padding: 3px 6px; border: 1px solid var(--line-2); border-radius: 4px;
+    font-size: 11.5px; font-weight: 600; color: var(--mute); background: var(--bg);
+    appearance: none; -webkit-appearance: none; cursor: pointer;
+  }
+  .itin-card-time-sel select:focus { outline: none; border-color: var(--coral); }
+
   /* 메인 컨테이너 */
   .main-content { max-width: 900px; margin: 0 auto; padding: 18px 18px 80px; }
-  .section-title { padding: 24px 4px 12px; font-size: 13px; font-weight: 700; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
+  .section-title { padding: 20px 4px 10px; font-size: 13px; font-weight: 700; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
   .section-title .add-btn { margin-left: auto; font-size: 12px; color: var(--coral); font-weight: 600; padding: 4px 10px; border-radius: 4px; }
   .section-title .add-btn:hover { background: var(--coral-soft); }
-
-  /* 대시보드 */
-  .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .dash-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 14px 16px; }
-  .dash-label { font-size: 11px; font-weight: 700; color: var(--mute); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-  .dash-value { font-family: 'Instrument Serif', serif; font-size: 28px; line-height: 1; font-weight: 400; letter-spacing: -0.02em; }
-  .dash-sub { font-size: 12px; color: var(--mute); margin-top: 6px; font-weight: 500; }
-
-  /* 여행 정보 카드 (인원·테마) */
-  .trip-info-card {
-    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l);
-    padding: 14px 18px; margin-top: 10px; display: flex; gap: 16px; align-items: center;
-  }
-  .trip-info-card .info-block { display: flex; align-items: center; gap: 8px; }
-  .trip-info-card .info-label { font-size: 11px; font-weight: 700; color: var(--mute); }
-  .trip-info-card .info-input {
-    border: 1px solid transparent; border-radius: 4px; padding: 4px 8px;
-    background: transparent; font-size: 13.5px; font-weight: 500;
-    min-width: 60px; max-width: 320px; width: auto;
-  }
-  .trip-info-card .info-input:hover { border-color: var(--line-2); }
-  .trip-info-card .info-input:focus { outline: none; border-color: var(--coral); background: var(--bg); }
-  .trip-info-card .theme-input { flex: 1; max-width: none; }
 
   /* 일정 */
   .day-block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); margin-bottom: 10px; overflow: hidden; }
@@ -250,7 +345,7 @@
   .day-stats { color: var(--mute); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .day-stats-budget { color: var(--mute-2); font-size: 11.5px; font-weight: 500; }
 
-  .day-body { padding: 0 18px 14px; border-top: 1px solid var(--line); }
+  .day-body { padding: 12px 14px 8px; border-top: 1px solid var(--line); }
   .itin-item { display: flex; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
   .itin-item:last-child { border-bottom: none; }
   .itin-order-btns { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; padding-top: 2px; }
@@ -576,26 +671,26 @@
 
     <main class="panel-center">
       <div class="main-content">
-        <!-- 대시보드 -->
-        <div class="dashboard" id="dashboard"></div>
+        <!-- 여행 헤더 카드 -->
+        <div class="trip-header-card" id="trip-header-card">
+          <div class="thc-title-row">
+            <div class="thc-title" id="thc-title"></div>
+            <button class="thc-edit-btn" id="btn-edit-trip">편집</button>
+          </div>
+          <div class="thc-period-row">
+            <span id="thc-period"></span>
+            <span class="thc-dday" id="thc-dday"></span>
+          </div>
+          <div class="thc-tags-row" id="thc-tags">
+            <!-- JS로 렌더 -->
+          </div>
+        </div>
 
-        <!-- 여행 정보 (인원·테마·여행지) -->
-        <div class="trip-info-card" id="trip-info-card">
-          <div class="info-block">
-            <span class="info-label">👥 인원</span>
-            <input type="number" class="info-input" id="trip-headcount" min="1" max="50" placeholder="—" style="width:60px;" />
-            <span style="color:var(--mute);font-size:12px;font-weight:500;">명</span>
-          </div>
-          <div style="width:1px;height:24px;background:var(--line);flex-shrink:0;"></div>
-          <div class="info-block" style="flex:1;">
-            <span class="info-label">📍 여행지</span>
-            <input type="text" class="info-input" id="trip-destinations" placeholder="방콕, 푸켓 (쉼표로 구분)" />
-          </div>
-          <div style="width:1px;height:24px;background:var(--line);flex-shrink:0;"></div>
-          <div class="info-block" style="flex:1;">
-            <span class="info-label">💭 테마</span>
-            <input type="text" class="info-input theme-input" id="trip-theme" placeholder="어떤 여행이 될 것 같아? ✨" />
-          </div>
+        <!-- 숨겨진 인풋 (trip-info-card에서 사용하던 값들 유지) -->
+        <div style="display:none;">
+          <input id="trip-headcount" type="number" />
+          <input id="trip-destinations" type="text" />
+          <input id="trip-theme" type="text" />
         </div>
 
         <!-- 날씨 (일정 섹션 제목 위) -->
@@ -1536,39 +1631,113 @@ async function loadItinerary() {
   itinerary = data || [];
 }
 
-function renderDashboard() {
-  const dash = $('#dashboard');
-  if (!currentTrip.start_date) { dash.innerHTML = ''; return; }
-  const dd = daysUntil(currentTrip.start_date);
-  const totalDays = currentTrip.end_date ? daysBetween(currentTrip.start_date, currentTrip.end_date).length : 1;
-  const totalCost = itinerary.reduce((sum, it) => sum + (it.estimated_cost || 0), 0);
-  const placedCount = itinerary.length;
-  const savedCount = savedPlaces.length;
-  const ddLabel = dd > 0 ? `D-${dd}` : (dd === 0 ? '오늘!' : `D+${-dd}`);
-  const perPerson = currentTrip.headcount ? Math.round(totalCost / currentTrip.headcount) : null;
+function renderDashboard() { renderTripHeader(); } // 하위 호환
 
-  dash.innerHTML = `
-    <div class="dash-card">
-      <div class="dash-label">⏰ 디데이</div>
-      <div class="dash-value">${ddLabel}</div>
-      <div class="dash-sub">${totalDays}일 일정</div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">📍 장소</div>
-      <div class="dash-value">${savedCount}<span style="font-size:14px;color:var(--mute);font-family:inherit;font-weight:600;"> / ${placedCount}</span></div>
-      <div class="dash-sub">저장 / 일정에 배치</div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">💸 예상 비용</div>
-      <div class="dash-value">${totalCost.toLocaleString()}<span style="font-size:13px;color:var(--mute);font-family:inherit;font-weight:600;"> 원</span></div>
-      <div class="dash-sub">일정 합산</div>
-    </div>
-    <div class="dash-card">
-      <div class="dash-label">👤 1인당</div>
-      <div class="dash-value">${perPerson != null ? perPerson.toLocaleString() : '—'}<span style="font-size:13px;color:var(--mute);font-family:inherit;font-weight:600;"> 원</span></div>
-      <div class="dash-sub">${currentTrip.headcount ? `${currentTrip.headcount}명 기준` : '인원 미입력'}</div>
-    </div>
-  `;
+function renderTripHeader() {
+  if (!currentTrip) return;
+  const dd = daysUntil(currentTrip.start_date);
+  const totalDays = (currentTrip.start_date && currentTrip.end_date)
+    ? daysBetween(currentTrip.start_date, currentTrip.end_date).length : null;
+  const ddLabel = dd == null ? '' : dd > 0 ? `D-${dd}` : dd === 0 ? 'D-Day' : `D+${-dd}`;
+
+  $('#thc-title').textContent = currentTrip.name || '';
+  $('#thc-period').textContent = [
+    fmtDateRange(currentTrip.start_date, currentTrip.end_date),
+    totalDays ? `${totalDays}일` : ''
+  ].filter(Boolean).join(' · ');
+  const ddEl = $('#thc-dday');
+  ddEl.textContent = ddLabel;
+  ddEl.style.display = ddLabel ? '' : 'none';
+
+  // 태그 렌더: 여행지들 + 인원 + + 추가 버튼
+  renderTripTags();
+}
+
+function renderTripTags() {
+  const tagsEl = $('#thc-tags');
+  if (!tagsEl) return;
+  const dests = currentTrip.destinations || [];
+  const headcount = currentTrip.headcount;
+  const totalCost = itinerary.reduce((s, it) => s + (it.estimated_cost || 0), 0);
+  const perPerson = headcount ? Math.round(totalCost / headcount) : null;
+
+  tagsEl.innerHTML = [
+    // 여행지 태그들
+    ...dests.map(d => `<span class="thc-tag" data-tag-dest="${esc(d)}">📍 ${esc(d)}</span>`),
+    // 인원 태그
+    headcount
+      ? `<span class="thc-tag" data-tag-type="headcount">👥 ${headcount}명${perPerson ? ` · 1인당 ${perPerson.toLocaleString()}원` : ''}</span>`
+      : '',
+    // + 여행지 추가 버튼
+    `<span class="thc-tag-add" id="btn-add-dest-tag">＋ 여행지</span>`,
+    // + 인원 추가
+    !headcount ? `<span class="thc-tag-add" id="btn-add-headcount-tag">＋ 인원</span>` : '',
+  ].join('');
+
+  // 여행지 태그 클릭 → 수정 모달
+  tagsEl.querySelectorAll('[data-tag-dest]').forEach(tag => {
+    tag.onclick = () => openModal('modal-edit-trip');
+  });
+  tagsEl.querySelectorAll('[data-tag-type="headcount"]').forEach(tag => {
+    tag.onclick = () => { openModal('modal-edit-trip'); };
+  });
+
+  // + 여행지 추가: 인라인 입력
+  const addDestBtn = tagsEl.querySelector('#btn-add-dest-tag');
+  if (addDestBtn) {
+    addDestBtn.onclick = () => {
+      addDestBtn.style.display = 'none';
+      const inp = document.createElement('input');
+      inp.className = 'thc-tag-input';
+      inp.placeholder = '방콕, 도쿄';
+      tagsEl.insertBefore(inp, addDestBtn);
+      inp.focus();
+      const commit = async () => {
+        const raw = inp.value.trim();
+        const newDests = raw ? raw.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : [];
+        if (newDests.length === 0) { inp.remove(); addDestBtn.style.display = ''; return; }
+        const merged = [...new Set([...dests, ...newDests])];
+        await sb.from('trips').update({ destinations: merged, dest_coords: {} }).eq('id', currentTrip.id);
+        currentTrip.destinations = merged; currentTrip.dest_coords = {};
+        $('#trip-destinations').value = merged.join(', ');
+        selectedWeatherDest = null; selectedWeatherDay = null;
+        weatherByDest = {}; weatherByDate = {}; weatherState = 'none';
+        renderTripTags();
+        loadWeather().then(() => renderItinerary());
+      };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { inp.remove(); addDestBtn.style.display = ''; }
+      });
+      inp.addEventListener('blur', commit);
+    };
+  }
+
+  // + 인원 추가: 인라인 입력
+  const addHcBtn = tagsEl.querySelector('#btn-add-headcount-tag');
+  if (addHcBtn) {
+    addHcBtn.onclick = () => {
+      addHcBtn.style.display = 'none';
+      const inp = document.createElement('input');
+      inp.className = 'thc-tag-input';
+      inp.type = 'number'; inp.placeholder = '3'; inp.style.width = '70px';
+      tagsEl.insertBefore(inp, addHcBtn);
+      inp.focus();
+      const commit = async () => {
+        const v = parseInt(inp.value) || null;
+        if (!v) { inp.remove(); addHcBtn.style.display = ''; return; }
+        await sb.from('trips').update({ headcount: v }).eq('id', currentTrip.id);
+        currentTrip.headcount = v;
+        $('#trip-headcount').value = v;
+        renderTripTags();
+      };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+        if (e.key === 'Escape') { inp.remove(); addHcBtn.style.display = ''; }
+      });
+      inp.addEventListener('blur', commit);
+    };
+  }
 }
 
 function renderItinerary() {
@@ -1635,33 +1804,40 @@ function renderItinerary() {
         <div class="day-body">
           ${items.length === 0
             ? '<div class="day-empty">아직 일정이 없어요. 가보고싶은 곳에서 + 일정 버튼을 눌러봐 ✨</div>'
-            : items.map((it, idx) => `
-                <div class="itin-item" data-id="${it.id}">
-                  <div class="itin-order-btns">
-                    <button class="itin-order-btn" data-move="up" data-id="${it.id}" ${idx === 0 ? 'disabled' : ''}>▲</button>
-                    <button class="itin-order-btn" data-move="down" data-id="${it.id}" ${idx === items.length - 1 ? 'disabled' : ''}>▼</button>
+            : items.map((it, idx) => {
+                const numColor = `nc-${(idx % 6) + 1}`;
+                const timeLabel = it.start_time
+                  ? (() => { const [h, m] = it.start_time.split(':'); const hh = parseInt(h); return `${hh < 12 ? '오전' : '오후'} ${hh === 0 ? 12 : hh > 12 ? hh - 12 : hh}:${m}`; })()
+                  : '시간 미정';
+                return `
+                <div class="itin-card" data-id="${it.id}">
+                  <div class="itin-card-left">
+                    <div class="itin-card-num ${numColor}">${idx + 1}</div>
+                    <div class="itin-card-time-sel">
+                      <select data-field="start_time" data-id="${it.id}" style="margin-top:6px;">
+                        ${makeTimeOptions(it.start_time ? it.start_time.substring(0,5) : '')}
+                      </select>
+                    </div>
                   </div>
-                  <div class="itin-time">
-                    <select data-field="start_time" data-id="${it.id}">
-                      ${makeTimeOptions(it.start_time ? it.start_time.substring(0,5) : '')}
-                    </select>
-                  </div>
-                  <div class="itin-content">
-                    <div class="itin-place">${esc(it.places?.name || it.title || '(삭제된 장소)')}</div>
-                    ${it.places?.address ? `<div class="itin-place-addr">${esc(it.places.address)}</div>` : ''}
-                    <textarea class="itin-memo" data-field="notes" data-id="${it.id}"
+                  <div class="itin-card-body">
+                    <div class="itin-card-name">${esc(it.places?.name || it.title || '(삭제된 장소)')}</div>
+                    <div class="itin-card-meta">
+                      ${it.places?.address ? `<span class="itin-card-addr">${esc(it.places.address.split(',')[0])}</span>` : ''}
+                    </div>
+                    <textarea class="itin-card-memo" data-field="notes" data-id="${it.id}"
                       placeholder="메모..." rows="1">${esc(it.notes || '')}</textarea>
                   </div>
-                  <div class="itin-cost">
-                    <div class="itin-cost-display" data-cost-display="${it.id}"
-                         style="${!it.estimated_cost ? 'color:var(--mute-2);font-weight:500;font-size:12px;' : ''}">
-                      ${it.estimated_cost ? Number(it.estimated_cost).toLocaleString() + '원' : '미입력'}
+                  <div class="itin-card-right">
+                    <div class="itin-card-cost-display ${!it.estimated_cost ? 'no-cost' : ''}"
+                         data-cost-display="${it.id}">
+                      ${it.estimated_cost ? Number(it.estimated_cost).toLocaleString() + '원' : '비용'}
                     </div>
                     <input type="number" class="itin-cost-input" data-field="estimated_cost" data-id="${it.id}"
                       value="${it.estimated_cost || ''}" placeholder="0" />
+                    <button class="itin-card-del" data-del-itin="${it.id}" title="삭제">×</button>
                   </div>
-                  <button class="itin-x" data-del-itin="${it.id}" title="삭제">×</button>
-                </div>`).join('')
+                </div>`;
+              }).join('')
           }
           <div class="day-direct-add" data-direct-add="${d}">+ 직접 일정 추가</div>
         </div>

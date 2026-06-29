@@ -708,7 +708,7 @@
   <div class="app-body">
     <aside class="panel panel-left" id="panel-left">
       <div class="search-wrap">
-        <div class="search-help">장소를 검색하거나 구글맵·네이버지도 URL을 붙여넣어줘 🗺️</div>
+        <div class="search-help">가고 싶은 곳을 검색하면 바로 저장돼요 🔍</div>
         <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;">
           <a href="https://www.google.com/maps" target="_blank" rel="noopener"
              style="font-size:11.5px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:5px;padding:3px 0;text-decoration:none;">
@@ -727,7 +727,7 @@
         </div>
         <div class="search-box">
           <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input type="text" class="search-input" id="paste-input" placeholder="장소 검색 또는 지도 링크 붙여넣기" autocomplete="off" />
+          <input type="text" class="search-input" id="paste-input" placeholder="카오산 로드, 왓포 사원..." autocomplete="off" />
           <div class="places-dropdown" id="places-dropdown"></div>
         </div>
         <div class="manual-add" id="btn-manual-add">✍️ 일단 이름만 적고 나중에 생각하기</div>
@@ -1170,38 +1170,58 @@ async function _fetchPlaceDetail(placeId) {
   });
 }
 
-/* 검색창 이벤트 바인딩 (openTrip 이후에 호출) */
+/* 검색창 초기화 — Places 자동완성 */
 function initSearchInput() {
   const input = $('#paste-input');
   const dropdown = $('#places-dropdown');
   if (!input || !dropdown) return;
+
+  // SDK 미리 로드 (검색 반응성을 위해)
+  if (IS_MAP_KEY_SET) {
+    loadGoogleMapsSDK().catch(() => {});
+  }
 
   function closeDropdown() {
     dropdown.classList.remove('active');
     dropdown.innerHTML = '';
   }
 
-  // 입력 이벤트 — URL 붙여넣기 vs 텍스트 검색 구분
+  function showLoading() {
+    dropdown.innerHTML = `<div class="places-item" style="justify-content:center;color:var(--mute);font-size:12.5px;gap:8px;">
+      <span class="loader"></span> 검색 중...
+    </div>`;
+    dropdown.classList.add('active');
+  }
+
   input.addEventListener('input', () => {
     const val = input.value.trim();
     if (!val) { closeDropdown(); _destroySession(); return; }
-
-    // URL 패턴 감지 → 기존 파싱 로직으로
-    if (/^https?:\/\//.test(val) || /map\.(naver|kakao)\.com/.test(val)) {
-      closeDropdown(); _destroySession(); return;
-    }
-
-    // 2글자 미만은 검색 안 함 (불필요한 호출 방지)
     if (val.length < 2) { closeDropdown(); return; }
 
-    // Google Maps SDK 로드 안 됐으면 스킵
-    if (!window.google || !IS_MAP_KEY_SET) return;
+    // API 키 없으면 안내
+    if (!IS_MAP_KEY_SET) {
+      dropdown.innerHTML = `<div class="places-item" style="color:var(--mute);font-size:12px;">
+        Google Maps API 키를 설정하면 검색이 활성화돼요
+      </div>`;
+      dropdown.classList.add('active');
+      return;
+    }
 
-    // 디바운스 300ms — 타이핑 멈출 때만 API 호출
     clearTimeout(_searchDebounce);
     _searchDebounce = setTimeout(async () => {
+      showLoading();
+
+      // SDK 아직 안 로드됐으면 기다리기
+      if (!googleMapsLoaded) {
+        try { await loadGoogleMapsSDK(); }
+        catch { closeDropdown(); toast('지도 서비스를 불러오지 못했어요'); return; }
+      }
+
       const predictions = await _fetchPredictions(val);
-      if (!predictions.length) { closeDropdown(); return; }
+      if (!predictions.length) {
+        dropdown.innerHTML = `<div class="places-item" style="color:var(--mute);font-size:12.5px;">검색 결과가 없어요</div>`;
+        return;
+      }
 
       dropdown.innerHTML = predictions.map(p => {
         const main = p.structured_formatting?.main_text || p.description;
@@ -1212,29 +1232,37 @@ function initSearchInput() {
             <div class="places-item-name">${esc(main)}</div>
             ${sub ? `<div class="places-item-addr">${esc(sub)}</div>` : ''}
           </div>
-          <span class="places-item-badge badge-google">Google</span>
         </div>`;
       }).join('');
-
       dropdown.classList.add('active');
 
-      // 결과 클릭 → 장소 상세 조회 후 저장
+      // 클릭 → 상세 조회 → 포스트잇으로 저장
       dropdown.querySelectorAll('.places-item').forEach(item => {
         item.onclick = async () => {
           const placeId = item.dataset.placeId;
-          input.value = item.querySelector('.places-item-name').textContent;
+          const name = item.querySelector('.places-item-name').textContent;
+          input.value = name;
           closeDropdown();
 
+          // 로딩 토스트
+          toast('장소 정보 가져오는 중...', 1500);
           const detail = await _fetchPlaceDetail(placeId);
-          if (!detail) { toast('장소 정보를 가져오지 못했어요'); return; }
 
-          const lat = detail.geometry?.location?.lat();
-          const lng = detail.geometry?.location?.lng();
+          if (!detail) {
+            // 상세 실패해도 이름만으로 저장
+            await savePlace({ name, address: null, lat: null, lng: null });
+            input.value = '';
+            return;
+          }
+
+          const lat = detail.geometry?.location?.lat() ?? null;
+          const lng = detail.geometry?.location?.lng() ?? null;
+
           await savePlace({
             name: detail.name,
             address: detail.formatted_address || null,
-            lat: lat ?? null,
-            lng: lng ?? null,
+            lat,
+            lng,
             google_place_id: detail.place_id || null,
             google_rating: detail.rating || null,
           });
@@ -1244,46 +1272,20 @@ function initSearchInput() {
     }, 300);
   });
 
-  // 붙여넣기 이벤트 — URL이면 기존 파싱
-  input.addEventListener('paste', () => {
-    setTimeout(() => {
-      const val = input.value.trim();
-      if (!/^https?:\/\//.test(val) && !/map\.(naver|kakao)\.com/.test(val)) return;
-      closeDropdown(); _destroySession();
-      const parsed = parseMapLink(val);
-      if (!parsed) { toast('지도 링크가 아닌 것 같아요'); return; }
-      if (parsed.error) { toast(parsed.error, 3500); return; }
-      const name = parsed.name || `${parsed.lat?.toFixed(4)}, ${parsed.lng?.toFixed(4)}`;
-      savePlace({ name, address: null, lat: parsed.lat, lng: parsed.lng });
-      input.value = '';
-    }, 50);
-  });
-
-  // Enter — URL이면 파싱, 텍스트면 드롭다운 첫 번째 선택
-  input.addEventListener('keydown', async (e) => {
-    if (e.key === 'Escape') { closeDropdown(); _destroySession(); input.value = ''; return; }
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-
-    const val = input.value.trim();
-    if (/^https?:\/\//.test(val)) {
-      closeDropdown(); _destroySession();
-      const parsed = parseMapLink(val);
-      if (!parsed || parsed.error) { toast(parsed?.error || '지도 링크가 아닌 것 같아요', 3500); return; }
-      const name = parsed.name || `${parsed.lat?.toFixed(4)}, ${parsed.lng?.toFixed(4)}`;
-      savePlace({ name, address: null, lat: parsed.lat, lng: parsed.lng });
-      input.value = ''; return;
+  // Esc → 닫기
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeDropdown(); _destroySession(); input.value = ''; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const first = dropdown.querySelector('.places-item[data-place-id]');
+      if (first) first.click();
     }
-
-    // 드롭다운 첫 번째 항목 자동 선택
-    const first = dropdown.querySelector('.places-item');
-    if (first) first.click();
   });
 
-  // 외부 클릭 시 드롭다운 닫기
+  // 외부 클릭 → 닫기
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-box')) { closeDropdown(); }
-  }, { capture: false });
+    if (!e.target.closest('.search-box')) closeDropdown();
+  });
 }
 let realtimeChannel = null;
 let pendingAddPlace = null;
@@ -1897,13 +1899,17 @@ function renderSaved() {
     const recommender = nameOf(p.added_by);
     const liked = myLikes.has(p.id);
     const likes = p.likes_count || 0;
-    const sub = p.address || (p.lat ? `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}` : '');
+    const sub = p.address ? p.address.split(',').slice(0,2).join(',') : '';
+    const rating = p.google_rating ? `⭐ ${p.google_rating}` : '';
     return `
       <div class="postit-card postit-bg-${bg}" data-id="${p.id}">
         <button class="postit-x" data-del="${p.id}" title="삭제">×</button>
         <div class="postit-name">${esc(p.name)}</div>
         ${sub ? `<div class="postit-meta">${esc(sub)}</div>` : ''}
-        <div class="postit-by">👤 ${esc(recommender === '나' ? '내' : recommender)} 추천</div>
+        <div class="postit-by" style="justify-content:space-between;">
+          <span>👤 ${esc(recommender === '나' ? '내' : recommender)} 추천</span>
+          ${rating ? `<span style="font-size:11.5px;font-weight:700;opacity:0.85;">${rating}</span>` : ''}
+        </div>
         <div class="postit-actions">
           <div class="postit-likes ${liked ? 'liked' : ''}" data-like="${p.id}">
             <span>${liked ? '❤️' : '🤍'}</span><span>${likes}</span>
@@ -2826,19 +2832,29 @@ $('#btn-export-json').onclick = () => {
 /* ============== MAP ============== */
 /* ============== GOOGLE MAPS ============== */
 
-/* Google Maps SDK 동적 로드 (한 번만) */
+/* Google Maps SDK — 지도·검색 공용. 앱 열자마자 로드 */
 function loadGoogleMapsSDK() {
   return new Promise((resolve, reject) => {
     if (googleMapsLoaded) { resolve(); return; }
-    if (!IS_MAP_KEY_SET) {
-      reject(new Error('NO_API_KEY')); return;
+    if (!IS_MAP_KEY_SET) { reject(new Error('NO_API_KEY')); return; }
+    if (window.__gmapsLoading) {
+      // 이미 로딩 중이면 완료 대기
+      const wait = setInterval(() => {
+        if (googleMapsLoaded) { clearInterval(wait); resolve(); }
+      }, 100);
+      return;
     }
-    // 콜백 함수 전역 등록
-    window.__gmapsReady = () => { googleMapsLoaded = true; resolve(); };
+    window.__gmapsLoading = true;
+    window.__gmapsReady = () => {
+      googleMapsLoaded = true;
+      window.__gmapsLoading = false;
+      _initPlacesServices();
+      resolve();
+    };
     const s = document.createElement('script');
     s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=__gmapsReady&libraries=places`;
     s.async = true; s.defer = true;
-    s.onerror = () => reject(new Error('LOAD_FAILED'));
+    s.onerror = () => { window.__gmapsLoading = false; reject(new Error('LOAD_FAILED')); };
     document.head.appendChild(s);
   });
 }
@@ -2908,7 +2924,6 @@ async function ensureMap() {
 
   mapInfoWindow = new google.maps.InfoWindow();
   mapInited = true;
-  _initPlacesServices(); // Places 서비스도 함께 초기화
   selectedMapDay = null; // 지도 열 때마다 전체보기로 초기화
   renderMapDayFilter();
   renderMarkers();
@@ -2919,9 +2934,9 @@ let selectedMapDay = null;
 
 // Day별 파스텔 색상
 const DAY_COLORS = [
-  '#F9A8A0','#93C5CC','#A8D5A2','#C5B4E3',
-  '#F4C06F','#82B9E8','#F0A0C0','#A0D4A0',
-  '#D4B4E8','#F4D080','#88C8D8','#C8D8A0'
+  '#E8483A','#2A7FBC','#2E9E5B','#8B4FBF',
+  '#D4760A','#1A6B8A','#C0394F','#2E7D5E',
+  '#6B3FAA','#B35C00','#1F5C99','#4A8A3A'
 ];
 
 function renderMapDayFilter() {
@@ -3041,14 +3056,15 @@ function _addMarker(place, num, color, bounds) {
   const pos = { lat: place.lat, lng: place.lng };
   bounds.extend(pos);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
-    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.25"/></filter>
-    <path d="M18 2C10.268 2 4 8.268 4 16c0 10.5 14 28 14 28S32 26.5 32 16C32 8.268 25.732 2 18 2z"
-          fill="${color}" stroke="white" stroke-width="2" filter="url(#sh)"/>
-    <circle cx="18" cy="16" r="9" fill="rgba(255,255,255,0.3)"/>
-    <text x="18" y="21" text-anchor="middle"
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="48" viewBox="0 0 38 48">
+    <filter id="sh${num}"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/></filter>
+    <path d="M19 2C10.716 2 4 8.716 4 17c0 11 15 29 15 29S34 28 34 17C34 8.716 27.284 2 19 2z"
+          fill="${color}" stroke="rgba(255,255,255,0.9)" stroke-width="2.5" filter="url(#sh${num})"/>
+    <text x="19" y="22" text-anchor="middle"
           font-family="system-ui,-apple-system,sans-serif"
-          font-size="${num > 9 ? '10' : '12'}" font-weight="800" fill="white">${num}</text>
+          font-size="${num > 9 ? '11' : '13'}" font-weight="900"
+          stroke="rgba(0,0,0,0.15)" stroke-width="0.5"
+          fill="white">${num}</text>
   </svg>`;
 
   const marker = new google.maps.Marker({
@@ -3056,8 +3072,8 @@ function _addMarker(place, num, color, bounds) {
     map,
     icon: {
       url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-      scaledSize: new google.maps.Size(36, 46),
-      anchor: new google.maps.Point(18, 46),
+      scaledSize: new google.maps.Size(38, 48),
+      anchor: new google.maps.Point(19, 48),
     },
     title: place.name,
     zIndex: num,

@@ -295,6 +295,31 @@
   .itin-x { color: var(--mute-2); padding: 4px; border-radius: 4px; line-height: 1; font-size: 16px; flex-shrink: 0; align-self: flex-start; }
   .itin-x:hover { color: var(--error); background: rgba(178,58,58,0.08); }
   .day-empty { color: var(--mute-2); font-size: 12.5px; padding: 18px 0; text-align: center; font-weight: 500; }
+  .day-direct-add {
+    margin-top: 6px; padding: 7px 10px; border: 1px dashed var(--line-2); border-radius: var(--r);
+    font-size: 12px; color: var(--mute-2); cursor: pointer; text-align: center;
+    transition: all .15s; font-weight: 500;
+  }
+  .day-direct-add:hover { border-color: var(--coral); color: var(--coral); }
+  /* 인라인 추가 입력행 */
+  .itin-add-row {
+    display: flex; gap: 8px; align-items: center; padding: 8px 0;
+    border-top: 1px solid var(--line); margin-top: 4px;
+  }
+  .itin-add-name {
+    flex: 1; padding: 6px 8px; border: 1px solid var(--line-2); border-radius: var(--r);
+    font-size: 13px; font-weight: 500; background: var(--bg);
+  }
+  .itin-add-name:focus { outline: none; border-color: var(--coral); background: var(--surface); }
+  .itin-add-confirm {
+    padding: 6px 12px; background: var(--coral); color: #fff; border-radius: var(--r);
+    font-size: 12px; font-weight: 700; flex-shrink: 0; transition: background .15s;
+  }
+  .itin-add-confirm:hover { background: var(--coral-deep); }
+  .itin-add-cancel {
+    padding: 6px 10px; color: var(--mute); font-size: 12px; font-weight: 500; flex-shrink: 0;
+  }
+  .itin-add-cancel:hover { color: var(--ink); }
 
   /* 체크리스트 그리드 (준비물 + 출국 전) */
   .check-grid { display: flex; flex-direction: column; gap: 10px; }
@@ -522,6 +547,18 @@
     <aside class="panel panel-left" id="panel-left">
       <div class="search-wrap">
         <div class="search-help">구글맵·네이버지도에서 가고 싶은 곳을 찾고<br/><b>주소창 URL을 복사해서</b> 아래에 붙여넣어줘 🗺️</div>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;">
+          <a href="https://www.google.com/maps" target="_blank" rel="noopener"
+             style="font-size:11.5px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:5px;padding:3px 0;text-decoration:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            구글맵 바로가기
+          </a>
+          <a href="https://map.naver.com" target="_blank" rel="noopener"
+             style="font-size:11.5px;font-weight:600;color:#03C75A;display:flex;align-items:center;gap:5px;padding:3px 0;text-decoration:none;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            네이버지도 바로가기
+          </a>
+        </div>
         <div class="search-box">
           <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           <input type="text" class="search-input" id="paste-input" placeholder="여기에 지도 링크 붙여넣기" />
@@ -1626,12 +1663,62 @@ function renderItinerary() {
                   <button class="itin-x" data-del-itin="${it.id}" title="삭제">×</button>
                 </div>`).join('')
           }
+          <div class="day-direct-add" data-direct-add="${d}">+ 직접 일정 추가</div>
         </div>
       </div>`;
   }).join('');
 
   /* Day 토글 */
   wrap.querySelectorAll('[data-toggle]').forEach(h => {
+
+  /* + 직접 일정 추가 */
+  wrap.querySelectorAll('[data-direct-add]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const date = btn.dataset.directAdd;
+      // 이미 입력행 있으면 무시
+      if (btn.previousElementSibling?.classList.contains('itin-add-row')) return;
+      btn.style.display = 'none';
+      const row = document.createElement('div');
+      row.className = 'itin-add-row';
+      row.innerHTML = `
+        <input class="itin-add-name" type="text" placeholder="일정 이름을 입력해줘" maxlength="80" />
+        <button class="itin-add-confirm">추가</button>
+        <button class="itin-add-cancel">취소</button>
+      `;
+      btn.parentNode.insertBefore(row, btn);
+      const input = row.querySelector('.itin-add-name');
+      const confirmBtn = row.querySelector('.itin-add-confirm');
+      const cancelBtn = row.querySelector('.itin-add-cancel');
+      input.focus();
+
+      const doAdd = async () => {
+        const title = input.value.trim();
+        if (!title) { input.focus(); return; }
+        const uid = await currentUid();
+        if (!uid) { toast('다시 로그인해주세요'); return; }
+        const existing = itinerary.filter(it => it.date === date);
+        const { error } = await sb.from('itinerary_items').insert({
+          trip_id: currentTrip.id,
+          title,          // place_id 없이 title로만 저장
+          place_id: null,
+          date,
+          sort_order: existing.length,
+          added_by: uid
+        });
+        if (error) { toast(error.message); return; }
+        row.remove(); btn.style.display = '';
+        toast(`${title} 추가됨 ✅`);
+      };
+
+      confirmBtn.onclick = doAdd;
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+        if (e.key === 'Escape') { row.remove(); btn.style.display = ''; }
+      });
+      cancelBtn.onclick = () => { row.remove(); btn.style.display = ''; };
+    };
+  });
 
   /* 날씨 날짜/여행지 선택 — 카드만 교체 */
   function rebindWeatherCard() {

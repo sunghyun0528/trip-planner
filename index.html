@@ -1076,10 +1076,13 @@ async function trackApiCall(apiName) {
     }
 
     _usageCache[key] = current + 1;
-    sb.from('api_usage').upsert(
-      { api: apiName, date: today, count: current + 1, updated_at: new Date().toISOString() },
-      { onConflict: 'api,date' }
-    ).catch(() => {}); // 실패해도 검색은 허용
+    // supabase-js 쿼리 빌더는 .catch() 메서드가 없으므로 await로 감싸서 처리
+    try {
+      await sb.from('api_usage').upsert(
+        { api: apiName, date: today, count: current + 1, updated_at: new Date().toISOString() },
+        { onConflict: 'api,date' }
+      );
+    } catch { /* 카운터 저장 실패해도 검색은 계속 허용 */ }
 
   } catch (e) {
     // api_usage 테이블 없거나 DB 오류 시 → 검색은 허용 (차단 안 함)
@@ -1198,6 +1201,7 @@ const PLACE_TYPE_MAP = {
   lodging:             { label: '숙소',   emoji: '🏨' },
   tourist_attraction:  { label: '관광지', emoji: '🎡' },
   museum:              { label: '박물관', emoji: '🏛' },
+  art_gallery:         { label: '미술관', emoji: '🖼' },
   shopping_mall:       { label: '쇼핑',   emoji: '🛍' },
   convenience_store:   { label: '편의점', emoji: '🏪' },
   spa:                 { label: '스파',   emoji: '💆' },
@@ -1206,17 +1210,32 @@ const PLACE_TYPE_MAP = {
   park:                { label: '공원',   emoji: '🌳' },
   beach:               { label: '해변',   emoji: '🏖' },
   temple:              { label: '사원',   emoji: '🛕' },
+  hindu_temple:        { label: '사원',   emoji: '🛕' },
+  place_of_worship:    { label: '사원',   emoji: '🛕' },
+  church:              { label: '교회',   emoji: '⛪' },
+  mosque:              { label: '모스크', emoji: '🕌' },
+  synagogue:           { label: '회당',   emoji: '🕍' },
+  zoo:                 { label: '동물원', emoji: '🦁' },
+  aquarium:            { label: '아쿠아리움', emoji: '🐠' },
+  movie_theater:       { label: '영화관', emoji: '🎬' },
+  stadium:             { label: '경기장', emoji: '🏟' },
+  natural_feature:     { label: '자연명소', emoji: '🏞' },
+  point_of_interest:   { label: '명소',   emoji: '📍' },
+  establishment:       { label: '장소',   emoji: '📍' },
   airport:             { label: '공항',   emoji: '✈️' },
   train_station:       { label: '기차역', emoji: '🚆' },
   bus_station:         { label: '버스터미널', emoji: '🚌' },
+  store:               { label: '상점',   emoji: '🏬' },
+  market:              { label: '시장',   emoji: '🏮' },
 };
 
 function placeTypeToCategory(types) {
-  if (!types || !types.length) return null;
+  if (!types || !types.length) return { label: '기타', emoji: '📍' };
   for (const t of types) {
     if (PLACE_TYPE_MAP[t]) return PLACE_TYPE_MAP[t];
   }
-  return null;
+  // 매핑 실패 시에도 null 대신 기본값 반환 (DB NOT NULL 제약 보호)
+  return { label: '기타', emoji: '📍' };
 }
 
 /* photo_reference → 이미지 URL 생성 (저장 시 1회만 호출 — 이후 렌더링은 저장된 URL 사용) */
@@ -1269,7 +1288,7 @@ function _bindDropdownClicks(dropdown, input, source) {
         const cat      = placeTypeToCategory(detail.types);
         const photoRef = detail.photos?.[0]?.photo_reference || null;
         const photoUrl = photoRef ? photoRefUrl(photoRef) : null;
-        const catStr   = cat ? `${cat.emoji} ${cat.label}` : null;
+        const catStr   = `${cat.emoji} ${cat.label}`; // 항상 값 보장 (places_db NOT NULL 제약 보호)
 
         await savePlace({
           name: detail.name, address: detail.formatted_address || null,
@@ -1279,33 +1298,69 @@ function _bindDropdownClicks(dropdown, input, source) {
           category: catStr, photo_ref: photoRef, photo_url: photoUrl,
         });
 
-        // Google에서 가져온 장소 → places_db 자동 캐싱
+        // Google에서 가져온 장소 → places_db 자동 캐싱 (place_id 있을 때만)
+        // 핵심: 이미 존재하는 행이면 city/country는 절대 덮어쓰지 않음
+        // (사용자가 여행지를 잘못 설정해놔도 기존 정확한 도시 정보가 깨지지 않도록)
         const dest = (currentTrip.destinations || [])[0] || null;
-        if (dest) {
-          const destCountry = CITY_COUNTRY_KO[dest] || 'TH';
-          const { error: cacheErr } = await sb.from('places_db').upsert({
-            name: detail.name, category: catStr,
-            country: destCountry, city: dest,
-            address: detail.formatted_address || null, lat, lng,
-            google_place_id: detail.place_id || null,
-            google_rating:   detail.rating || null,
-            review_count:    detail.user_ratings_total || null,
-            photo_url: photoUrl, photo_ref: photoRef,
-            source: 'user',
-          }, { onConflict: 'google_place_id' });
-
-          if (cacheErr) {
-            console.error('[places_db 자동 캐싱 실패]', cacheErr.message, cacheErr);
-          } else {
-            console.log('[places_db 자동 캐싱 성공]', detail.name, `(${dest}, ${destCountry})`);
-          }
+        if (dest && detail.place_id) {
+          await cachePlaceToDb(detail, catStr, photoUrl, photoRef, lat, lng, dest);
         } else {
-          console.warn('[places_db 캐싱 스킵] 여행지(destinations)가 설정되지 않음');
+          console.warn('[places_db 캐싱 스킵]', !dest ? '여행지(destinations) 미설정' : 'google_place_id 없음');
         }
       }
       input.value = '';
     };
   });
+}
+
+/* places_db 안전 캐싱 — city/country 보호 로직
+   기존 행 있음 → 평점/리뷰수/사진만 갱신 (city는 그대로 유지)
+   기존 행 없음 → 새로 INSERT (현재 여행지를 city로 사용) */
+async function cachePlaceToDb(detail, catStr, photoUrl, photoRef, lat, lng, currentDest) {
+  const { data: existing, error: selErr } = await sb
+    .from('places_db')
+    .select('id, city, country')
+    .eq('google_place_id', detail.place_id)
+    .maybeSingle();
+
+  if (selErr) {
+    console.error('[places_db 캐싱 확인 실패]', selErr.message, selErr);
+    return;
+  }
+
+  if (existing) {
+    // 이미 존재 → city/country 건드리지 않고 신선도 정보만 갱신
+    const { error: updErr } = await sb.from('places_db')
+      .update({
+        google_rating: detail.rating || null,
+        review_count: detail.user_ratings_total || null,
+        photo_url: photoUrl || undefined,
+        photo_ref: photoRef || undefined,
+        address: detail.formatted_address || undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+
+    if (updErr) console.error('[places_db 갱신 실패]', updErr.message, updErr);
+    else console.log(`[places_db 갱신 성공] ${detail.name} (기존 city='${existing.city}' 유지)`);
+    return;
+  }
+
+  // 없음 → 새로 INSERT (현재 여행지를 city로 사용)
+  const destCountry = CITY_COUNTRY_KO[currentDest] || 'TH';
+  const { error: insErr } = await sb.from('places_db').insert({
+    name: detail.name, category: catStr,
+    country: destCountry, city: currentDest,
+    address: detail.formatted_address || null, lat, lng,
+    google_place_id: detail.place_id,
+    google_rating: detail.rating || null,
+    review_count: detail.user_ratings_total || null,
+    photo_url: photoUrl, photo_ref: photoRef,
+    source: 'user',
+  });
+
+  if (insErr) console.error('[places_db 신규 저장 실패]', insErr.message, insErr);
+  else console.log(`[places_db 신규 저장 성공] ${detail.name} (${currentDest}, ${destCountry})`);
 }
 
 function initSearchInput() {
@@ -1348,46 +1403,34 @@ function initSearchInput() {
     _searchDebounce = setTimeout(async () => {
       showLoading();
 
-      // ── 1차: Supabase 자체 DB 검색 ──────────────────────────
-      const { data: cached, error: dbErr } = await sb
-        .rpc('search_places_db', {
-          _query: val,
-          _city: (currentTrip.destinations || [])[0] || null,
-          _limit: 6
-        });
+      // ── 1단계: 자체 DB 검색 (현재 여행지로 필터) ──────────────
+      const myCity = (currentTrip.destinations || [])[0] || null;
+      const { data: cached1, error: dbErr1 } = await sb
+        .rpc('search_places_db', { _query: val, _city: myCity, _limit: 6 });
 
-      if (dbErr) {
-        console.error('[places_db 검색 실패]', dbErr.message, dbErr);
-      } else {
-        console.log(`[places_db 검색] "${val}" → ${cached?.length || 0}건 매칭 (city필터: ${(currentTrip.destinations || [])[0] || '없음'})`);
-      }
+      if (dbErr1) console.error('[places_db 검색 실패 · 1단계]', dbErr1.message, dbErr1);
+      console.log(`[places_db 1단계] "${val}" city=${myCity || '없음'} → ${cached1?.length || 0}건`);
 
-      if (!dbErr && cached && cached.length > 0) {
-        // 자체 DB 히트 → Google API 안 씀
-        dropdown.innerHTML = cached.map(p => `
-          <div class="places-item" data-from="db" data-db-id="${p.id}"
-               data-name="${esc(p.name)}" data-address="${esc(p.address || '')}"
-               data-lat="${p.lat || ''}" data-lng="${p.lng || ''}"
-               data-place-id="${p.google_place_id || ''}"
-               data-rating="${p.google_rating || ''}"
-               data-category="${esc(p.category || '')}"
-               data-photo-url="${esc(p.photo_url || '')}">
-            <div class="places-item-icon">${p.category?.split(' ')[0] || '📍'}</div>
-            <div class="places-item-info">
-              <div class="places-item-name">${esc(p.name)}</div>
-              ${p.address ? `<div class="places-item-addr">${esc(p.address.split(',').slice(0,2).join(','))}</div>` : ''}
-            </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
-              ${p.google_rating ? `<span style="font-size:11px;font-weight:700;color:#2d6a4f;">⭐ ${p.google_rating}</span>` : ''}
-              <span class="places-item-badge" style="background:#e8f5e9;color:#2e7d32;">자체DB</span>
-            </div>
-          </div>`).join('');
-        dropdown.classList.add('active');
-        _bindDropdownClicks(dropdown, input, 'db');
+      if (!dbErr1 && cached1 && cached1.length > 0) {
+        renderDbResults(cached1, false);
         return;
       }
 
-      // ── 2차: Google Places API 폴백 ─────────────────────────
+      // ── 2단계: 자체 DB 검색 (도시 필터 없이 전체) ──────────────
+      // 여행지 설정이 다르거나(예: 베이루트) 누락된 경우에도
+      // 이미 DB에 있는 장소면 Google을 호출하지 않고 찾아냄
+      const { data: cached2, error: dbErr2 } = await sb
+        .rpc('search_places_db', { _query: val, _city: null, _limit: 6 });
+
+      if (dbErr2) console.error('[places_db 검색 실패 · 2단계]', dbErr2.message, dbErr2);
+      console.log(`[places_db 2단계 · 전체도시] "${val}" → ${cached2?.length || 0}건`);
+
+      if (!dbErr2 && cached2 && cached2.length > 0) {
+        renderDbResults(cached2, true);
+        return;
+      }
+
+      // ── 3단계: Google Places API 폴백 ─────────────────────────
       if (!IS_MAP_KEY_SET) {
         dropdown.innerHTML = `<div class="places-item" style="color:var(--mute);font-size:12px;">
           Google Maps API 키를 설정하면 더 많은 장소를 검색할 수 있어요
@@ -1419,6 +1462,34 @@ function initSearchInput() {
           <span class="places-item-badge badge-google">Google</span>
         </div>`;
       }).join('');
+      dropdown.classList.add('active');
+      _bindDropdownClicks(dropdown, input, 'google');
+
+      // 자체 DB 검색 결과 렌더 헬퍼 (1단계/2단계 공용)
+      function renderDbResults(rows, isOtherCity) {
+        dropdown.innerHTML = rows.map(p => `
+          <div class="places-item" data-from="db" data-db-id="${p.id}"
+               data-name="${esc(p.name)}" data-address="${esc(p.address || '')}"
+               data-lat="${p.lat || ''}" data-lng="${p.lng || ''}"
+               data-place-id="${p.google_place_id || ''}"
+               data-rating="${p.google_rating || ''}"
+               data-category="${esc(p.category || '')}"
+               data-photo-url="${esc(p.photo_url || '')}">
+            <div class="places-item-icon">${p.category?.split(' ')[0] || '📍'}</div>
+            <div class="places-item-info">
+              <div class="places-item-name">${esc(p.name)}</div>
+              ${p.address ? `<div class="places-item-addr">${esc(p.address.split(',').slice(0,2).join(','))}</div>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
+              ${p.google_rating ? `<span style="font-size:11px;font-weight:700;color:#2d6a4f;">⭐ ${p.google_rating}</span>` : ''}
+              <span class="places-item-badge" style="background:${isOtherCity ? '#fef3e2' : '#e8f5e9'};color:${isOtherCity ? '#92400e' : '#2e7d32'};">
+                ${isOtherCity ? `자체DB · ${esc(p.city || '다른도시')}` : '자체DB'}
+              </span>
+            </div>
+          </div>`).join('');
+        dropdown.classList.add('active');
+        _bindDropdownClicks(dropdown, input, 'db');
+      }
       dropdown.classList.add('active');
       _bindDropdownClicks(dropdown, input, 'google');
 

@@ -1224,6 +1224,14 @@ function photoRefUrl(photoRef, maxWidth = 400) {
   if (!photoRef || !IS_MAP_KEY_SET) return null;
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoRef}&key=${GOOGLE_MAPS_API_KEY}`;
 }
+/* 도시(한국어) → 국가코드 — places_db 자동 캐싱 시 정확한 country 저장용 */
+const CITY_COUNTRY_KO = {
+  '방콕': 'TH', '푸켓': 'TH', '치앙마이': 'TH', '파타야': 'TH', '끄라비': 'TH',
+  '도쿄': 'JP', '오사카': 'JP', '후쿠오카': 'JP',
+  '다낭': 'VN', '하노이': 'VN', '호치민': 'VN',
+  '싱가포르': 'SG', '타이베이': 'TW',
+};
+
 /* 드롭다운 클릭 핸들러 — DB 결과와 Google 결과 분기 */
 function _bindDropdownClicks(dropdown, input, source) {
   dropdown.querySelectorAll('.places-item').forEach(item => {
@@ -1274,18 +1282,25 @@ function _bindDropdownClicks(dropdown, input, source) {
         // Google에서 가져온 장소 → places_db 자동 캐싱
         const dest = (currentTrip.destinations || [])[0] || null;
         if (dest) {
-          sb.from('places_db').upsert({
+          const destCountry = CITY_COUNTRY_KO[dest] || 'TH';
+          const { error: cacheErr } = await sb.from('places_db').upsert({
             name: detail.name, category: catStr,
-            country: 'TH', city: dest,
+            country: destCountry, city: dest,
             address: detail.formatted_address || null, lat, lng,
             google_place_id: detail.place_id || null,
             google_rating:   detail.rating || null,
             review_count:    detail.user_ratings_total || null,
             photo_url: photoUrl, photo_ref: photoRef,
             source: 'user',
-          }, { onConflict: 'google_place_id' }).then(() => {
-            console.log('[캐시] places_db 자동 저장:', detail.name);
-          }).catch(() => {});
+          }, { onConflict: 'google_place_id' });
+
+          if (cacheErr) {
+            console.error('[places_db 자동 캐싱 실패]', cacheErr.message, cacheErr);
+          } else {
+            console.log('[places_db 자동 캐싱 성공]', detail.name, `(${dest}, ${destCountry})`);
+          }
+        } else {
+          console.warn('[places_db 캐싱 스킵] 여행지(destinations)가 설정되지 않음');
         }
       }
       input.value = '';
@@ -1340,6 +1355,12 @@ function initSearchInput() {
           _city: (currentTrip.destinations || [])[0] || null,
           _limit: 6
         });
+
+      if (dbErr) {
+        console.error('[places_db 검색 실패]', dbErr.message, dbErr);
+      } else {
+        console.log(`[places_db 검색] "${val}" → ${cached?.length || 0}건 매칭 (city필터: ${(currentTrip.destinations || [])[0] || '없음'})`);
+      }
 
       if (!dbErr && cached && cached.length > 0) {
         // 자체 DB 히트 → Google API 안 씀

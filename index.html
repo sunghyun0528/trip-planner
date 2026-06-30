@@ -1320,8 +1320,11 @@ function _bindDropdownClicks(dropdown, input, source) {
         const lat      = detail.geometry?.location?.lat() ?? null;
         const lng      = detail.geometry?.location?.lng() ?? null;
         const cat      = placeTypeToCategory(detail.types);
-        const photoRef = detail.photos?.[0]?.photo_reference || null;
-        const photoUrl = photoRef ? photoRefUrl(photoRef) : null;
+        // JS SDK의 PlacePhoto는 photo_reference 속성을 제공하지 않음(REST API 전용 필드).
+        // 대신 getUrl()을 직접 호출해서 URL을 즉시 얻어야 함.
+        const firstPhoto = detail.photos?.[0] || null;
+        const photoUrl   = firstPhoto?.getUrl ? firstPhoto.getUrl({ maxWidth: 400 }) : null;
+        const photoRef   = null; // JS SDK 경로에서는 reference 자체를 못 얻으므로 URL만 저장
         const catStr   = `${cat.emoji} ${cat.label}`; // 항상 값 보장 (places_db NOT NULL 제약 보호)
 
         await savePlace({

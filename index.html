@@ -1184,7 +1184,7 @@ async function _fetchPlaceDetail(placeId) {
     _placesService.getDetails({
       placeId,
       sessionToken: token,
-      fields: ['name', 'geometry', 'formatted_address', 'rating', 'types', 'place_id', 'photos', 'price_level'],
+      fields: ['name', 'geometry', 'formatted_address', 'rating', 'types', 'place_id', 'photos', 'price_level', 'address_components'],
     }, (place, status) => {
       if (status !== google.maps.places.PlacesServiceStatus.OK) { resolve(null); return; }
       resolve(place);
@@ -1250,6 +1250,40 @@ const CITY_COUNTRY_KO = {
   '다낭': 'VN', '하노이': 'VN', '호치민': 'VN',
   '싱가포르': 'SG', '타이베이': 'TW',
 };
+
+/* 영문 도시명 → 한국어 도시명 (Google address_components는 보통 영문/현지어로 반환) */
+const CITY_EN_TO_KO = {
+  'bangkok': '방콕', 'phuket': '푸켓', 'chiang mai': '치앙마이',
+  'pattaya': '파타야', 'krabi': '끄라비',
+  'tokyo': '도쿄', 'osaka': '오사카', 'fukuoka': '후쿠오카',
+  'da nang': '다낭', 'hanoi': '하노이', 'ho chi minh city': '호치민', 'ho chi minh': '호치민',
+  'singapore': '싱가포르', 'taipei': '타이베이',
+};
+
+/* Google address_components에서 실제 도시/국가 추출
+   여행지 설정값(currentDest)보다 이게 항상 우선 — 사용자 설정 실수를 방지 */
+function extractRealCity(addressComponents) {
+  if (!addressComponents || !addressComponents.length) return null;
+
+  // locality(시/구) 우선, 없으면 administrative_area_level_1(주/도)로 폴백
+  const locality = addressComponents.find(c => c.types.includes('locality'));
+  const admin1   = addressComponents.find(c => c.types.includes('administrative_area_level_1'));
+  const countryComp = addressComponents.find(c => c.types.includes('country'));
+
+  const rawCity = (locality || admin1)?.long_name?.toLowerCase().trim();
+  const countryCode = countryComp?.short_name || null;
+
+  if (!rawCity) return null;
+
+  // 영문 도시명 → 한국어로 매핑 시도
+  const cityKo = CITY_EN_TO_KO[rawCity] || null;
+
+  return {
+    cityKo,                  // 매핑 성공 시 한국어 도시명, 실패 시 null
+    cityRaw: (locality || admin1)?.long_name || null, // 원본 도시명 (영문/현지어)
+    country: countryCode,
+  };
+}
 
 /* 드롭다운 클릭 핸들러 — DB 결과와 Google 결과 분기 */
 function _bindDropdownClicks(dropdown, input, source) {
@@ -1346,11 +1380,31 @@ async function cachePlaceToDb(detail, catStr, photoUrl, photoRef, lat, lng, curr
     return;
   }
 
-  // 없음 → 새로 INSERT (현재 여행지를 city로 사용)
-  const destCountry = CITY_COUNTRY_KO[currentDest] || 'TH';
+  // 없음 → 새로 INSERT
+  // city 결정 우선순위: ① Google 주소에서 추출한 실제 도시 → ② 여행지 설정값 (폴백)
+  const real = extractRealCity(detail.address_components);
+  let finalCity, finalCountry;
+
+  if (real?.cityKo) {
+    // 매핑 테이블에 있는 도시면 한국어로 정확히 저장
+    finalCity = real.cityKo;
+    finalCountry = real.country || CITY_COUNTRY_KO[real.cityKo] || 'TH';
+    console.log(`[city 결정] 주소 기반: ${finalCity} (${finalCountry})`);
+  } else if (real?.cityRaw) {
+    // 매핑 테이블에 없는 새 도시 → 원본 그대로 저장 (베이루트로 잘못 들어가는 것보다 훨씬 정확)
+    finalCity = real.cityRaw;
+    finalCountry = real.country || 'TH';
+    console.log(`[city 결정] 주소 기반(미등록 도시): ${finalCity} (${finalCountry})`);
+  } else {
+    // 주소 파싱 완전 실패 시에만 여행지 설정값 사용
+    finalCity = currentDest;
+    finalCountry = CITY_COUNTRY_KO[currentDest] || 'TH';
+    console.warn(`[city 결정] 주소 파싱 실패 → 여행지 설정값 폴백: ${finalCity}`);
+  }
+
   const { error: insErr } = await sb.from('places_db').insert({
     name: detail.name, category: catStr,
-    country: destCountry, city: currentDest,
+    country: finalCountry, city: finalCity,
     address: detail.formatted_address || null, lat, lng,
     google_place_id: detail.place_id,
     google_rating: detail.rating || null,
@@ -1360,7 +1414,7 @@ async function cachePlaceToDb(detail, catStr, photoUrl, photoRef, lat, lng, curr
   });
 
   if (insErr) console.error('[places_db 신규 저장 실패]', insErr.message, insErr);
-  else console.log(`[places_db 신규 저장 성공] ${detail.name} (${currentDest}, ${destCountry})`);
+  else console.log(`[places_db 신규 저장 성공] ${detail.name} (${finalCity}, ${finalCountry})`);
 }
 
 function initSearchInput() {

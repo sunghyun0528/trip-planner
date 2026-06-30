@@ -728,7 +728,7 @@
   <header class="app-header">
     <div class="h-left">
       <button class="btn btn-ghost" id="btn-back" title="여행 목록">←</button>
-      <div style="min-width: 0; cursor: pointer;" id="btn-edit-trip" title="여행 정보 수정">
+      <div style="min-width: 0; cursor: pointer;" id="btn-edit-trip-header" title="여행 정보 수정">
         <div class="trip-name" id="current-name"></div>
         <div class="trip-meta" id="current-meta" style="display:flex;align-items:center;gap:6px;">
           <span id="current-meta-text"></span>
@@ -910,12 +910,16 @@
 <div class="modal-bg" id="modal-edit-trip">
   <div class="modal">
     <h2>여행 정보 수정</h2>
-    <p class="lede">여행 이름과 날짜를 바꿀 수 있어요</p>
+    <p class="lede">기존 정보가 자동으로 채워져 있어요. 바꾸고 싶은 것만 수정하면 돼요</p>
     <div class="field"><label>여행 이름</label><input type="text" class="input" id="et-name" /></div>
     <div class="field"><label>여행지 <span style="font-weight:500;color:var(--mute)">(날씨 표시용, 쉼표로 구분)</span></label><input type="text" class="input" id="et-destinations" placeholder="방콕, 푸켓" /></div>
     <div class="row">
       <div class="field"><label>시작일</label><input type="date" class="input" id="et-start" /></div>
       <div class="field"><label>종료일</label><input type="date" class="input" id="et-end" /></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>인원수</label><input type="number" min="1" max="20" class="input" id="et-headcount" placeholder="3" /></div>
+      <div class="field"><label>여행 테마</label><input type="text" class="input" id="et-theme" placeholder="먹방, 휴양, 관광..." /></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-close>취소</button>
@@ -2018,14 +2022,21 @@ sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') { user = null; currentTrip = null; showScreen('screen-auth'); }
 });
 
-$('#btn-edit-trip').onclick = () => {
-  $('#et-name').value = currentTrip.name || '';
-  $('#et-start').value = currentTrip.start_date || '';
-  $('#et-end').value = currentTrip.end_date || '';
+/* 편집 모달 열기 — 헤더 클릭과 '편집' 버튼 둘 다 이 함수를 씀 */
+function openEditTrip() {
+  if (!currentTrip) return;
+  $('#et-name').value         = currentTrip.name        || '';
+  $('#et-start').value        = currentTrip.start_date  || '';
+  $('#et-end').value          = currentTrip.end_date    || '';
   $('#et-destinations').value = (currentTrip.destinations || []).join(', ');
+  $('#et-headcount').value    = currentTrip.headcount   || '';
+  $('#et-theme').value        = currentTrip.theme       || '';
   openModal('modal-edit-trip');
   setTimeout(() => $('#et-name').focus(), 100);
-};
+}
+
+$('#btn-edit-trip').onclick        = openEditTrip;  // 여행 헤더 카드 "편집" 버튼
+$('#btn-edit-trip-header').onclick = openEditTrip;  // 상단 헤더 여행명 클릭
 
 $('#btn-save-trip-edit').onclick = async () => {
   const name = $('#et-name').value.trim();
@@ -2033,11 +2044,14 @@ $('#btn-save-trip-edit').onclick = async () => {
   const end = $('#et-end').value || null;
   const destRaw = $('#et-destinations').value.trim();
   const destinations = destRaw ? destRaw.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : [];
+  const headcount = parseInt($('#et-headcount').value) || null;
+  const theme = $('#et-theme').value.trim() || null;
   if (!name) { toast('이름을 입력해줘'); return; }
   if (start && end && start > end) { toast('종료일이 시작일보다 빨라요'); return; }
 
   const { error } = await sb.from('trips').update({
     name, start_date: start, end_date: end, destinations,
+    headcount, theme,
     dest_coords: {},  // 여행지 바뀔 수 있으니 좌표 캐시 초기화
   }).eq('id', currentTrip.id);
 
@@ -2048,6 +2062,8 @@ $('#btn-save-trip-edit').onclick = async () => {
   currentTrip.end_date = end;
   currentTrip.destinations = destinations;
   currentTrip.dest_coords = {};
+  currentTrip.headcount = headcount;
+  currentTrip.theme = theme;
 
   $('#current-name').textContent = name;
   $('#current-meta-text').textContent = fmtDateRange(start, end);
@@ -2066,11 +2082,19 @@ $('#btn-save-trip-edit').onclick = async () => {
 
 /* ============== TRIPS LIST ============== */
 async function loadTrips() {
-  const { data, error } = await sb.from('trips').select('*').order('created_at', { ascending: false });
+  const uid = await currentUid();
+  if (!uid) return;
+  // 내가 멤버인 여행만 가져오기 (trip_members 조인)
+  const { data, error } = await sb
+    .from('trip_members')
+    .select('trip_id, trips(*)')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false, referencedTable: 'trips' });
   const list = $('#trips-list');
   if (error) { list.innerHTML = `<div class="empty">불러오기 오류: ${esc(error.message)}</div>`; return; }
-  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">아직 여행이 없네요. 첫 여행을 만들어보세요 ✨</div>'; return; }
-  list.innerHTML = data.map(t => `
+  const trips = (data || []).map(row => row.trips).filter(Boolean);
+  if (!trips.length) { list.innerHTML = '<div class="empty">아직 여행이 없네요. 첫 여행을 만들어보세요 ✨</div>'; return; }
+  list.innerHTML = trips.map(t => `
     <div class="trip-card" data-id="${t.id}">
       <div><h3>${esc(t.name)}</h3><div class="meta">${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}</div></div>
       <div class="arrow">→</div>

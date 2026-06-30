@@ -53,7 +53,11 @@
   .hint { font-size: 11.5px; color: #999; margin-top: 4px; }
   .copy-btn { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid #ccc; background: #fff; cursor: pointer; margin-left: 8px; }
   .copy-btn:hover { background: #f0f0f0; }
-  .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 6px; }
+  .cat-grid { margin-top: 6px; }
+  .term-chip { display: inline-block; padding: 3px 10px; margin: 2px; border-radius: 999px; background: #eef6ff; color: #1a5a96; font-size: 11.5px; font-weight: 600; }
+  .cat-group-label { font-size: 11px; font-weight: 700; color: #999; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .cat-group-label:first-child { margin-top: 0; }
+  .cat-group-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .cat-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 12.5px; transition: all .15s; user-select: none; }
   .cat-item:hover { border-color: #999; background: #fafafa; }
   .cat-item.on { background: #2d2d2d; border-color: #2d2d2d; color: #fff; }
@@ -68,9 +72,11 @@
 <!-- Apify JSON 생성기 -->
 <div class="card">
   <div class="card-title">📋 1단계 — Apify 입력값 만들기</div>
-  <div class="hint" style="margin-bottom:14px;">
+  <div class="hint" style="margin-bottom:14px;line-height:1.6;">
     💡 평점 필터는 Apify가 직접 지원해서 수집 전에 걸러줘요 (크레딧 절약).
-    리뷰수 필터는 Apify가 미지원이라 수집 후 2단계에서 거릅니다.
+    리뷰수 필터는 Apify가 미지원이라 수집 후 2단계에서 거릅니다.<br/>
+    🔍 검색어를 한국어로 세분화했어요 — "관광지" 대신 "사원·왕궁·랜드마크"처럼
+    구체적으로 나누면 왓아룬 같은 유명 장소가 더 잘 잡혀요.
   </div>
 
   <div class="row">
@@ -96,13 +102,13 @@
     <div class="field">
       <label>카테고리당 수집 수</label>
       <select id="gen-max" onchange="regenJson()">
-        <option value="20">20개 (테스트)</option>
-        <option value="40">40개</option>
-        <option value="60" selected>60개</option>
+        <option value="15">15개 (테스트)</option>
+        <option value="20">20개</option>
+        <option value="30" selected>30개</option>
+        <option value="50">50개</option>
         <option value="100">100개</option>
-        <option value="150">150개</option>
       </select>
-      <div class="hint">평점 필터 적용 후 개수라 실제 더 적게 나올 수 있어요</div>
+      <div class="hint">카테고리가 구체적이라 적은 개수로도 충분해요</div>
     </div>
     <div class="field">
       <label>최소 평점 (Apify 단계 필터링)</label>
@@ -127,6 +133,7 @@
     <label>카테고리 선택 (여러 개 가능)</label>
     <div class="cat-grid" id="cat-grid"></div>
     <div class="hint"><span id="cat-count">0</span>개 선택됨 · <a href="#" onclick="selectAllCats(true);return false;" style="font-weight:600;">전체선택</a> · <a href="#" onclick="selectAllCats(false);return false;" style="font-weight:600;">전체해제</a></div>
+    <div id="cat-preview" style="margin-top:8px;"></div>
   </div>
 
   <div class="row" style="margin-top:10px;">
@@ -137,6 +144,7 @@
         <option value="50">50개 이상</option>
         <option value="100" selected>100개 이상</option>
         <option value="500">500개 이상</option>
+        <option value="1000">1,000개 이상 (확실히 유명한 곳만)</option>
       </select>
       <div class="hint">⚠️ Apify는 리뷰수 필터 미지원 — 수집 후 저장 단계에서 거름</div>
     </div>
@@ -283,42 +291,54 @@ const CITY_COUNTRY = {
   'Singapore': 'SG', 'Taipei': 'TW',
 };
 
-/* 수집 카테고리 — Apify searchStringsArray용 영문 검색어 + 한국어 라벨 */
+/* 수집 카테고리 — 자연어 검색 문구 (도시명은 JSON 생성 시 자동으로 앞에 붙음)
+   핵심 원리: "관광지"처럼 포괄적 카테고리어는 Google이 분류 필터로 처리해서
+   박물관·동물원 등이 골고루 섞여 나오고 정작 왓아룬 같은 핫플레이스가 묻힘.
+   반면 "가볼만한곳"처럼 실제 한국인이 검색하는 자연어 문구는 Google이
+   인기도·관련도 기준으로 처리해서 유명 랜드마크가 상위에 노출됨. */
 const SCRAPE_CATEGORIES = [
-  { key: 'tourist attraction', label: '🎡 관광지', on: true },
-  { key: 'cafe',               label: '☕ 카페',   on: true },
-  { key: 'restaurant',         label: '🍽 맛집',   on: true },
-  { key: 'street food',        label: '🥢 길거리음식', on: false },
-  { key: 'shopping mall',      label: '🛍 쇼핑몰', on: false },
-  { key: 'market',             label: '🏮 시장',   on: false },
-  { key: 'spa',                label: '💆 스파·마사지', on: false },
-  { key: 'rooftop bar',        label: '🌆 루프탑바', on: false },
-  { key: 'night club',         label: '🎵 나이트라이프', on: false },
-  { key: 'museum',             label: '🏛 박물관', on: false },
-  { key: 'art gallery',        label: '🖼 미술관', on: false },
-  { key: 'park',               label: '🌳 공원',   on: false },
-  { key: 'temple',             label: '🛕 사원',   on: false },
-  { key: 'beach',              label: '🏖 해변',   on: false },
-  { key: 'amusement park',     label: '🎠 놀이공원', on: false },
-  { key: 'zoo',                label: '🦁 동물원', on: false },
-  { key: 'aquarium',           label: '🐠 아쿠아리움', on: false },
-  { key: 'bakery',             label: '🥐 베이커리', on: false },
-  { key: 'dessert shop',       label: '🍰 디저트', on: false },
-  { key: 'bar',                label: '🍺 바',     on: false },
-  { key: 'viewpoint',          label: '🌄 전망대', on: false },
-  { key: 'hiking trail',       label: '🥾 트레킹', on: false },
-  { key: 'water park',         label: '🌊 워터파크', on: false },
-  { key: 'photo spot',         label: '📸 포토스팟', on: false },
+  // 랜드마크 발굴 — 자연어 검색으로 인기 명소 우선 노출
+  { key: '가볼만한곳',    label: '⭐ 가볼만한곳 (추천)', on: true,  group: '랜드마크 발굴' },
+  { key: '관광명소',      label: '📍 관광명소', on: true,  group: '랜드마크 발굴' },
+  { key: '핫플레이스',    label: '🔥 핫플레이스', on: false, group: '랜드마크 발굴' },
+  { key: '사원',          label: '🛕 사원·왓', on: true,  group: '랜드마크 발굴' },
+  { key: '야경 명소',     label: '🌃 야경 명소', on: false, group: '랜드마크 발굴' },
+
+  // 음식·카페
+  { key: '맛집',          label: '🍽 맛집', on: true,  group: '음식·카페' },
+  { key: '유명 맛집',     label: '👍 유명 맛집', on: false, group: '음식·카페' },
+  { key: '카페',          label: '☕ 카페', on: true,  group: '음식·카페' },
+  { key: '디저트 맛집',   label: '🍰 디저트', on: false, group: '음식·카페' },
+  { key: '길거리음식',    label: '🥢 길거리음식', on: false, group: '음식·카페' },
+  { key: '루프탑바',      label: '🌆 루프탑바', on: false, group: '음식·카페' },
+
+  // 쇼핑·체험
+  { key: '쇼핑',          label: '🛍 쇼핑', on: false, group: '쇼핑·체험' },
+  { key: '야시장',        label: '🌙 야시장', on: false, group: '쇼핑·체험' },
+  { key: '스파 마사지',   label: '💆 스파·마사지', on: false, group: '쇼핑·체험' },
+  { key: '나이트라이프',  label: '🎵 나이트라이프', on: false, group: '쇼핑·체험' },
+
+  // 자연·액티비티
+  { key: '공원',          label: '🌳 공원', on: false, group: '자연·액티비티' },
+  { key: '해변',          label: '🏖 해변', on: false, group: '자연·액티비티' },
+  { key: '박물관',        label: '🏛 박물관', on: false, group: '자연·액티비티' },
+  { key: '전망대',        label: '🌄 전망대', on: false, group: '자연·액티비티' },
+  { key: '포토스팟',      label: '📸 포토스팟', on: false, group: '자연·액티비티' },
 ];
 
 /* 카테고리 그리드 렌더 */
 function renderCatGrid() {
   const grid = document.getElementById('cat-grid');
-  grid.innerHTML = SCRAPE_CATEGORIES.map((c, i) => `
-    <label class="cat-item ${c.on ? 'on' : ''}" data-idx="${i}">
-      <input type="checkbox" ${c.on ? 'checked' : ''} onchange="toggleCat(${i})" />
-      ${c.label}
-    </label>
+  const groups = [...new Set(SCRAPE_CATEGORIES.map(c => c.group))];
+  grid.innerHTML = groups.map(g => `
+    <div class="cat-group-label">${g}</div>
+    <div class="cat-group-row">
+      ${SCRAPE_CATEGORIES.map((c, i) => c.group === g ? `
+        <label class="cat-item ${c.on ? 'on' : ''}" data-idx="${i}">
+          <input type="checkbox" ${c.on ? 'checked' : ''} onchange="toggleCat(${i})" />
+          ${c.label}
+        </label>` : '').join('')}
+    </div>
   `).join('');
   updateCatCount();
 }
@@ -346,7 +366,7 @@ function updateCatCount() {
   document.getElementById('cat-count').textContent = n;
 }
 
-/* JSON 동적 생성 — 국가명 없이 도시만 searchStringsArray에 사용 */
+/* JSON 동적 생성 — 도시명을 검색어 앞에 자동 결합 ("방콕 관광명소" 형태) */
 function regenJson() {
   const cityVal = document.getElementById('gen-city').value; // "Bangkok|방콕"
   const [cityEn, cityKo] = cityVal.split('|');
@@ -358,17 +378,25 @@ function regenJson() {
 
   document.getElementById('country-code').value = country;
   document.getElementById('city-country-hint').textContent =
-    `locationQuery: "${cityEn}" 단독 사용 (국가명 생략 — Apify가 자동 인식)`;
+    `검색어 예시: "${cityKo} 가볼만한곳" · locationQuery: "${cityEn}"`;
 
-  const selectedCats = SCRAPE_CATEGORIES.filter(c => c.on).map(c => c.key);
+  const selectedCats = SCRAPE_CATEGORIES.filter(c => c.on);
   if (!selectedCats.length) {
     document.getElementById('apify-json').textContent = '// 카테고리를 1개 이상 선택해주세요';
+    document.getElementById('cat-preview').textContent = '';
     return;
   }
 
+  // 도시명 + 카테고리 결합 — "방콕" + "가볼만한곳" = "방콕 가볼만한곳"
+  const searchTerms = selectedCats.map(c => `${cityKo} ${c.key}`);
+
+  // 미리보기 표시
+  document.getElementById('cat-preview').innerHTML =
+    searchTerms.map(t => `<span class="term-chip">${esc(t)}</span>`).join('');
+
   const json = {
-    searchStringsArray: selectedCats,
-    locationQuery: cityEn,                 // 도시만 — "Bangkok" (국가 중복 제거)
+    searchStringsArray: searchTerms,
+    locationQuery: cityEn,                 // 도시만 — "Bangkok" (국가 중복 제거, 지리적 앵커용)
     maxCrawledPlacesPerSearch: parseInt(maxResults),
     language: lang,
     includeOpeningHours: true,
@@ -386,6 +414,8 @@ function regenJson() {
 
   document.getElementById('apify-json').textContent = JSON.stringify(json, null, 2);
 }
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function copyJson() {
   const text = document.getElementById('apify-json').textContent.trim();
@@ -482,18 +512,44 @@ const CAT_MAP = {
   'aquarium': '🎠 아쿠아리움',
 };
 
+/* Google이 language:ko일 때 categoryName을 한국어로 반환하므로
+   한국어 키워드 매칭도 함께 둠 (예: "커피숍/커피 전문점", "불교 사찰") */
+const CAT_MAP_KO = [
+  ['사원', '🛕 사원'], ['사찰', '🛕 사원'], ['왓', '🛕 사원'],
+  ['왕궁', '👑 왕궁'], ['궁전', '👑 왕궁'],
+  ['카페', '☕ 카페'], ['커피', '☕ 카페'],
+  ['음식점', '🍽 맛집'], ['레스토랑', '🍽 맛집'], ['식당', '🍽 맛집'],
+  ['시장', '🏮 시장'],
+  ['스파', '💆 스파'], ['마사지', '💆 스파'],
+  ['바', '🎵 나이트라이프'], ['나이트클럽', '🎵 나이트라이프'],
+  ['박물관', '🏛 박물관'], ['미술관', '🏛 박물관'],
+  ['공원', '🌳 공원'], ['정원', '🌳 공원'],
+  ['해변', '🏖 해변'], ['비치', '🏖 해변'],
+  ['놀이공원', '🎠 놀이공원'], ['워터파크', '🎠 놀이공원'],
+  ['동물원', '🦁 동물원'], ['아쿠아리움', '🐠 아쿠아리움'], ['수족관', '🐠 아쿠아리움'],
+  ['전망대', '🌄 전망대'], ['뷰포인트', '🌄 전망대'],
+  ['쇼핑몰', '🛍 쇼핑'], ['백화점', '🛍 쇼핑'],
+  ['관광 명소', '📍 랜드마크'], ['명소', '📍 랜드마크'], ['랜드마크', '📍 랜드마크'],
+];
+
 function normalizeCategory(item) {
-  // categoryName 필드 (Apify 기본 출력)
+  // categoryName 필드 (Apify 기본 출력) — language:ko면 한국어로 옴
   const raw = (item.categoryName || '').toLowerCase().trim();
   // categories 배열 (categories: ["Restaurant", "Thai restaurant"])
   const cats = (item.categories || []).map(c => c.toLowerCase().trim());
 
-  // 직접 매핑
+  // 1순위: 한국어 키워드 매칭 (categoryName이 한글일 가능성 높음)
+  for (const [kw, label] of CAT_MAP_KO) {
+    if (raw.includes(kw)) return label;
+    if (cats.some(c => c.includes(kw))) return label;
+  }
+
+  // 2순위: 영문 직접 매핑
   if (CAT_MAP[raw]) return CAT_MAP[raw];
   for (const c of cats) {
     if (CAT_MAP[c]) return CAT_MAP[c];
   }
-  // 부분 매핑
+  // 3순위: 영문 부분 매핑
   for (const [key, val] of Object.entries(CAT_MAP)) {
     if (raw.includes(key) || cats.some(c => c.includes(key))) return val;
   }

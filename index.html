@@ -1319,7 +1319,7 @@ function fmtTravelInfo(distanceM, durationS) {
   const timeLabel = mins < 60 ? `${mins}분` : `${Math.floor(mins/60)}시간 ${mins%60}분`;
   return `🚗 ${timeLabel} · ${km}km`;
 }
-}
+
 /* 도시(한국어) → 국가코드 — places_db 자동 캐싱 시 정확한 country 저장용 */
 const CITY_COUNTRY_KO = {
   '방콕': 'TH', '푸켓': 'TH', '치앙마이': 'TH', '파타야': 'TH', '끄라비': 'TH',

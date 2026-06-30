@@ -345,6 +345,28 @@
   }
   .itin-card-time-sel select:focus { outline: none; border-color: var(--coral); }
 
+  /* 이동시간 표시 */
+  .itin-travel-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .itin-travel-info {
+    font-size: 11.5px; font-weight: 700; color: var(--accent);
+    background: var(--bg); padding: 3px 9px; border-radius: 999px;
+  }
+  .itin-travel-btn {
+    width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line-2);
+    background: var(--surface); color: var(--mute); font-size: 11px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .itin-travel-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .itin-travel-btn-full {
+    font-size: 11.5px; font-weight: 700; color: var(--mute);
+    background: var(--bg); border: 1px dashed var(--line-2);
+    padding: 4px 10px; border-radius: 999px; transition: all .15s;
+  }
+  .itin-travel-btn-full:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+  .itin-travel-btn-full.loading { opacity: 0.6; pointer-events: none; }
+
   /* 메인 컨테이너 */
   .main-content { max-width: 900px; margin: 0 auto; padding: 18px 18px 80px; }
   .section-title { padding: 20px 4px 10px; font-size: 13px; font-weight: 700; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
@@ -1040,6 +1062,7 @@ const API_LIMITS = {
   places_autocomplete:  { daily: 400,  warn: 300  },  // 자동완성 세션
   places_detail:        { daily: 200,  warn: 150  },  // 장소 상세
   geocoding:            { daily: 150,  warn: 100  },  // 좌표 변환
+  routes:               { daily: 100,  warn: 70   },  // 이동시간 조회 (버튼 클릭 시에만)
   gemini:               { daily: 80,   warn: 60   },  // AI 꿀팁
 };
 
@@ -1237,6 +1260,65 @@ function placeTypeToCategory(types) {
 function photoRefUrl(photoRef, maxWidth = 400) {
   if (!photoRef || !IS_MAP_KEY_SET) return null;
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoRef}&key=${GOOGLE_MAPS_API_KEY}`;
+}
+
+/* ============================================================
+   Routes API — 이동시간/거리 조회
+   - 버튼 클릭 시에만 호출 (자동 호출 절대 금지)
+   - 결과는 itinerary_items에 캐싱, 같은 구간 재조회 시 API 호출 없이 DB에서 읽음
+   - 폴리라인도 함께 저장 (지금은 화면에 안 그리지만, 추후 동선 표시 시 재호출 불필요)
+   ============================================================ */
+async function fetchTravelInfo(origin, dest) {
+  const allowed = await trackApiCall('routes');
+  if (!allowed) return null;
+
+  try {
+    const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+        'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+      },
+      body: JSON.stringify({
+        origin:      { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+        destination: { location: { latLng: { latitude: dest.lat,   longitude: dest.lng   } } },
+        travelMode: 'DRIVE',
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[Routes API 오류]', res.status, errText);
+      return null;
+    }
+
+    const data = await res.json();
+    const route = data.routes?.[0];
+    if (!route) return null;
+
+    // duration은 "1234s" 형태 문자열로 옴
+    const durationSec = route.duration ? parseInt(route.duration.replace('s', '')) : null;
+
+    return {
+      distanceM: route.distanceMeters || null,
+      durationS: durationSec,
+      polyline: route.polyline?.encodedPolyline || null,
+    };
+  } catch (e) {
+    console.error('[Routes API 호출 실패]', e.message);
+    return null;
+  }
+}
+
+/* 초/미터를 사람이 읽기 좋은 형태로 변환 */
+function fmtTravelInfo(distanceM, durationS) {
+  if (distanceM == null || durationS == null) return null;
+  const km = (distanceM / 1000).toFixed(1);
+  const mins = Math.round(durationS / 60);
+  const timeLabel = mins < 60 ? `${mins}분` : `${Math.floor(mins/60)}시간 ${mins%60}분`;
+  return `🚗 ${timeLabel} · ${km}km`;
+}
 }
 /* 도시(한국어) → 국가코드 — places_db 자동 캐싱 시 정확한 country 저장용 */
 const CITY_COUNTRY_KO = {
@@ -2444,6 +2526,29 @@ function renderItinerary() {
                 const timeLabel = it.start_time
                   ? (() => { const [h, m] = it.start_time.split(':'); const hh = parseInt(h); return `${hh < 12 ? '오전' : '오후'} ${hh === 0 ? 12 : hh > 12 ? hh - 12 : hh}:${m}`; })()
                   : '시간 미정';
+
+                // 이동시간 표시 — 첫 일정(idx===0)은 표시 안 함, 직전 일정 좌표 필요
+                const prevItem = idx > 0 ? items[idx - 1] : null;
+                const hasCoords = prevItem?.places?.lat != null && it.places?.lat != null;
+                const cachedTravel = (it.travel_distance_m != null && it.travel_duration_s != null)
+                  ? fmtTravelInfo(it.travel_distance_m, it.travel_duration_s)
+                  : null;
+
+                let travelHtml = '';
+                if (idx > 0) {
+                  if (cachedTravel) {
+                    // 이미 캐싱됨 — DB 값 표시 + 다시 보기 버튼 (클릭해도 API 호출 없이 DB 값만 재표시)
+                    travelHtml = `<div class="itin-travel-row">
+                      <span class="itin-travel-info">${cachedTravel}</span>
+                      <button class="itin-travel-btn" data-travel-btn="${it.id}" data-cached="1" title="저장된 정보 다시 보기">↺</button>
+                    </div>`;
+                  } else if (hasCoords) {
+                    travelHtml = `<div class="itin-travel-row">
+                      <button class="itin-travel-btn-full" data-travel-btn="${it.id}" data-cached="0">🚗 이동시간 확인</button>
+                    </div>`;
+                  }
+                }
+
                 return `
                 <div class="itin-card" data-id="${it.id}">
                   <div class="itin-card-left">
@@ -2455,6 +2560,7 @@ function renderItinerary() {
                     </div>
                   </div>
                   <div class="itin-card-body">
+                    ${travelHtml}
                     <div class="itin-card-name">${esc(it.places?.name || it.title || '(삭제된 장소)')}</div>
                     <div class="itin-card-meta">
                       ${it.places?.address ? `<span class="itin-card-addr">${esc(it.places.address.split(',')[0])}</span>` : ''}
@@ -2481,6 +2587,76 @@ function renderItinerary() {
 
   /* Day 토글 */
   wrap.querySelectorAll('[data-toggle]').forEach(h => {
+
+  /* 이동시간 버튼 */
+  wrap.querySelectorAll('[data-travel-btn]').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const itId = btn.dataset.travelBtn;
+      const isCached = btn.dataset.cached === '1';
+
+      if (isCached) {
+        // 이미 DB에 값 있음 — API 호출 없이 그냥 토스트로 다시 보여주기
+        const it = itinerary.find(x => x.id === itId);
+        if (it) {
+          const info = fmtTravelInfo(it.travel_distance_m, it.travel_duration_s);
+          toast(info || '저장된 이동정보가 없어요');
+        }
+        return;
+      }
+
+      // 캐싱 안 됨 — 직전 일정 좌표 찾아서 Routes API 호출
+      const it = itinerary.find(x => x.id === itId);
+      if (!it) return;
+
+      const dayItems = itinerary
+        .filter(x => x.date === it.date)
+        .sort((a, b) => (a.start_time || '99:99') < (b.start_time || '99:99') ? -1 : 1);
+      const idx = dayItems.findIndex(x => x.id === itId);
+      const prev = idx > 0 ? dayItems[idx - 1] : null;
+
+      if (!prev?.places?.lat || !it.places?.lat) {
+        toast('좌표 정보가 없어서 이동시간을 계산할 수 없어요');
+        return;
+      }
+
+      btn.classList.add('loading');
+      btn.textContent = '계산 중...';
+
+      const result = await fetchTravelInfo(
+        { lat: prev.places.lat, lng: prev.places.lng },
+        { lat: it.places.lat, lng: it.places.lng }
+      );
+
+      if (!result) {
+        btn.classList.remove('loading');
+        btn.textContent = '🚗 이동시간 확인';
+        toast('이동시간을 가져오지 못했어요. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+
+      // DB에 캐싱
+      const { error } = await sb.from('itinerary_items').update({
+        travel_distance_m: result.distanceM,
+        travel_duration_s: result.durationS,
+        travel_polyline: result.polyline,
+      }).eq('id', itId);
+
+      if (error) {
+        console.error('[이동시간 저장 실패]', error.message);
+        toast('저장에 실패했어요');
+        btn.classList.remove('loading');
+        btn.textContent = '🚗 이동시간 확인';
+        return;
+      }
+
+      // 로컬 상태 갱신 + 카드만 다시 렌더 (전체 리렌더 안 함)
+      it.travel_distance_m = result.distanceM;
+      it.travel_duration_s = result.durationS;
+      it.travel_polyline = result.polyline;
+      renderItinerary();
+    };
+  });
 
   /* + 직접 일정 추가 */
   wrap.querySelectorAll('[data-direct-add]').forEach(btn => {

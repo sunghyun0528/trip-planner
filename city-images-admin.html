@@ -35,31 +35,26 @@ input:focus { outline:none; border-color:#2d2d2d; background:#fff; }
 
 /* 실제 카드와 동일한 미리보기 */
 .preview-label { font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+/* 미리보기 — 실제 카드와 동일한 2단 구조 */
 .trip-card-preview {
-  display:flex; justify-content:space-between; align-items:center;
-  padding:22px 24px; background:#fff; border:1px solid #e5e5e5;
-  border-radius:12px; position:relative; overflow:hidden;
+  display:flex; align-items:stretch;
+  background:#fff; border:1px solid #e5e5e5;
+  border-radius:12px; overflow:hidden;
   width:100%; max-width:720px;
 }
-.trip-card-bg {
-  position:absolute; inset:0;
-  /* 비율 무시하고 카드 전체를 채움 */
-  background-size:100% 100%;
-  background-repeat:no-repeat;
+.trip-card-info-preview {
+  flex:1; padding:20px 22px;
+  display:flex; flex-direction:column; justify-content:center; gap:4px;
+  min-width:0;
 }
-.trip-card-overlay {
-  position:absolute; inset:0;
-  background:linear-gradient(to right,
-    rgba(255,255,255,0.96) 0%,
-    rgba(255,255,255,0.85) 45%,
-    rgba(255,255,255,0.25) 75%,
-    rgba(255,255,255,0.00) 100%
-  );
+.trip-card-info-preview h3 { font-size:26px; font-weight:400; margin:0; font-family:'Instrument Serif',Georgia,serif; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.trip-card-info-preview .meta { color:#888; font-size:13px; font-weight:500; }
+.trip-card-img-preview {
+  width:320px; flex-shrink:0;
+  background-size:100% 100%; background-repeat:no-repeat;
+  background-color:#f5f5f5;
+  aspect-ratio:1500/400;
 }
-.trip-card-content { position:relative; z-index:1; }
-.trip-card-content h3 { font-size:26px; font-weight:400; margin:0 0 4px; font-family:'Instrument Serif',Georgia,serif; letter-spacing:-.02em; }
-.trip-card-content .meta { color:#888; font-size:13px; font-weight:500; }
-.trip-card-arrow { position:relative; z-index:1; color:#ccc; font-size:18px; }
 
 /* 도시 목록 */
 table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -151,15 +146,13 @@ tr:hover td { background:#fafafa; }
     <div id="preview-wrap" style="display:none;margin-top:4px;">
       <div class="preview-label">실제 카드 미리보기 (비율 무시, 카드에 꽉 맞춤)</div>
       <div class="trip-card-preview">
-        <div class="trip-card-bg" id="preview-bg"></div>
-        <div class="trip-card-overlay"></div>
-        <div class="trip-card-content">
+        <div class="trip-card-info-preview">
           <h3 id="preview-city-name">도시명</h3>
           <div class="meta">7월 1일 – 7월 5일 · 3명 · 맛집투어</div>
         </div>
-        <div class="trip-card-arrow">→</div>
+        <div class="trip-card-img-preview" id="preview-bg"></div>
       </div>
-      <div class="hint" style="margin-top:6px;">💡 이미지가 카드 전체에 꽉 차게 늘어납니다. 가로로 긴 사진일수록 왜곡이 적습니다.</div>
+      <div class="hint" style="margin-top:6px;">💡 우측 이미지 영역이 1500:400 비율 (320px × 85px). 가로로 긴 사진일수록 왜곡이 적습니다.</div>
     </div>
 
     <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
@@ -224,12 +217,10 @@ function updatePreview() {
   const bg = document.getElementById('preview-bg');
   const wrap = document.getElementById('preview-wrap');
   document.getElementById('preview-city-name').textContent = ko || '도시명';
-  if (url) {
-    bg.style.backgroundImage = `url('${url}')`;
-    wrap.style.display = 'block';
-  } else {
-    wrap.style.display = 'none';
-  }
+  // URL 있으면 이미지 표시, 없으면 회색 빈칸
+  bg.style.backgroundImage = url ? `url('${url}')` : 'none';
+  // 미리보기는 URL 있을 때만 표시
+  wrap.style.display = url ? 'block' : 'none';
 }
 
 function authenticate() {

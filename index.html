@@ -102,6 +102,10 @@
   /* 카드 — 패딩 제거 (각 섹션이 개별 처리) */
   .trip-card { display: flex; align-items: stretch; min-height: 100px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); margin-bottom: 10px; cursor: pointer; transition: all .15s; overflow: hidden; }
   .trip-card:hover { border-color: var(--ink); transform: translateY(-1px); }
+  /* 삭제 버튼 — 호버 시만 표시 */
+  .trip-card-del { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(0,0,0,0.15); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 10; transition: background .15s; }
+  .trip-card-del:hover { background: rgba(220,50,50,0.85); }
+  .trip-card:hover .trip-card-del { display: flex; }
   /* 좌측 — 타이트한 정보 영역 */
   .trip-card-info { width: 240px; flex-shrink: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
   .trip-card h3 { font-family: 'Instrument Serif', serif; font-size: 22px; font-weight: 400; margin: 0; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2119,7 +2123,8 @@ async function loadTrips() {
     const cityImg = firstDest ? cityImgMap[firstDest] : null;
     const metaStr = `${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}`;
     return `
-      <div class="trip-card" data-id="${t.id}">
+      <div class="trip-card" data-id="${t.id}" style="position:relative;">
+        <button class="trip-card-del" data-del-trip="${t.id}" title="여행 삭제">×</button>
         <div class="trip-card-info">
           <h3>${esc(t.name)}</h3>
           <div class="meta">${metaStr}</div>
@@ -2131,6 +2136,44 @@ async function loadTrips() {
       </div>`;
   }).join('');
   list.querySelectorAll('.trip-card').forEach(el => { el.onclick = () => openTrip(el.dataset.id); });
+
+  // 여행 삭제 버튼 — stopPropagation으로 카드 클릭(openTrip) 막기
+  list.querySelectorAll('[data-del-trip]').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const tripId = btn.dataset.delTrip;
+      const card = btn.closest('.trip-card');
+      const name = card.querySelector('h3')?.textContent || '이 여행';
+      if (!confirm(`"${name}"을 삭제할까요?\n여행에 저장된 장소, 일정, 메모가 모두 삭제됩니다.`)) return;
+
+      // 낙관적 UI — 먼저 카드 제거
+      card.style.opacity = '0.4';
+      card.style.pointerEvents = 'none';
+
+      // 관련 데이터 순서대로 삭제 (FK 의존성 고려)
+      await sb.from('itinerary_items').delete().eq('trip_id', tripId);
+      await sb.from('places').delete().eq('trip_id', tripId);
+      await sb.from('checklists').delete().eq('trip_id', tripId);
+      await sb.from('links').delete().eq('trip_id', tripId);
+      await sb.from('expenses').delete().eq('trip_id', tripId);
+      await sb.from('trip_members').delete().eq('trip_id', tripId);
+      const { error } = await sb.from('trips').delete().eq('id', tripId);
+
+      if (error) {
+        toast('삭제 실패 😢 다시 시도해줘');
+        card.style.opacity = '1';
+        card.style.pointerEvents = 'auto';
+        console.error('[여행 삭제 실패]', error.message);
+      } else {
+        card.remove();
+        toast('여행이 삭제됐어요');
+        // 카드가 모두 없어졌으면 빈 상태 메시지 표시
+        if (!list.querySelector('.trip-card')) {
+          list.innerHTML = '<div class="empty">아직 여행이 없네요. 첫 여행을 만들어보세요 ✨</div>';
+        }
+      }
+    };
+  });
 }
 
 $('#btn-new-trip').onclick = () => {

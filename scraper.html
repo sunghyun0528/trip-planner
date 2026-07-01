@@ -1,1 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>몽실이 장소 DB 임포터</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: system-ui,-apple-system,sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #2d2d2d; max-width: 1000px; }
+h1 { font-size: 22px; margin-bottom: 4px; }
+.sub { color: #888; font-size: 13px; margin-bottom: 24px; line-height: 1.7; }
+.card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.card-title { font-weight: 700; font-size: 14px; margin-bottom: 14px; }
+label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .04em; display: block; margin-bottom: 4px; }
+input, select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fafafa; width: 100%; }
+input:focus, select:focus { outline: none; border-color: #2d2d2d; background: #fff; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.field { flex: 1; min-width: 180px; }
+.hint { font-size: 11.5px; color: #999; margin-top: 4px; }
+.btn { padding: 10px 20px; border-radius: 6px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.btn-primary { background: #2d2d2d; color: #fff; }
+.btn-primary:hover { background: #111; }
+.btn-primary:disabled { background: #bbb; cursor: not-allowed; }
+.btn-outline { background: #fff; border: 1.5px solid #ccc; color: #555; }
+.btn-outline:hover { border-color: #2d2d2d; color: #2d2d2d; }
+.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin: 14px 0; }
+.stat { background: #f8f8f8; border-radius: 8px; padding: 12px; text-align: center; border: 1px solid #eee; }
+.stat-val { font-size: 24px; font-weight: 800; }
+.stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+.green { color: #2e7d32; } .orange { color: #e65100; } .red { color: #c62828; }
+.progress { background: #eee; border-radius: 999px; height: 6px; margin: 10px 0; overflow: hidden; }
+.progress-bar { height: 100%; background: #2d2d2d; transition: width .3s; border-radius: 999px; }
+.log { background: #1a1a1a; color: #e0e0e0; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 11.5px; height: 220px; overflow-y: auto; }
+.log-line { margin: 1.5px 0; }
+.ok { color: #68d391; } .skip { color: #f6e05e; } .err { color: #fc8181; } .info { color: #90cdf4; } .dim { color: #666; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { background: #f8f8f8; padding: 8px 10px; text-align: left; font-size: 11px; color: #888; border-bottom: 2px solid #eee; }
+td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; }
+.b-saved { background: #c6f6d5; color: #276749; }
+.b-skip  { background: #fefcbf; color: #744210; }
+.b-err   { background: #fed7d7; color: #742a2a; }
+img.thumb { width: 48px; height: 36px; object-fit: cover; border-radius: 4px; }
+.drop-zone { border: 2px dashed #ddd; border-radius: 8px; padding: 28px; text-align: center; cursor: pointer; transition: all .15s; color: #aaa; font-size: 14px; }
+.drop-zone:hover, .drop-zone.drag { border-color: #2d2d2d; color: #2d2d2d; background: #fafafa; }
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 6px; margin-top: 6px; }
+.cat-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 12.5px; transition: all .15s; user-select: none; }
+.cat-item:hover { border-color: #999; background: #fafafa; }
+.cat-item.on { background: #2d2d2d; border-color: #2d2d2d; color: #fff; }
+.cat-item input { display: none; }
+.term-chip { display: inline-block; padding: 3px 10px; margin: 2px; border-radius: 999px; background: #eef6ff; color: #1a5a96; font-size: 11.5px; font-weight: 600; }
+</style>
+</head>
+<body>
 
+<h1>&#x1F5FA; 몽실이 장소 DB 임포터</h1>
+<p class="sub">Apify에서 수집한 JSON을 Supabase places_db에 저장합니다.</p>
+
+<!-- 1단계: Apify 입력값 생성 -->
+<div class="card">
+  <div class="card-title">&#x1F4CB; 1단계 — Apify 입력값 만들기</div>
+  <div class="hint" style="margin-bottom:14px;">
+    &#x1F4A1; 평점 필터는 Apify가 직접 지원(크레딧 절약). 리뷰수·숙소제외는 수집 후 2단계에서 거릅니다.
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>도시</label>
+      <select id="gen-city" onchange="regenJson()">
+        <option value="Bangkok|방콕">방콕 (Bangkok)</option>
+        <option value="Phuket|푸켓">푸켓 (Phuket)</option>
+        <option value="Chiang Mai|치앙마이">치앙마이 (Chiang Mai)</option>
+        <option value="Pattaya|파타야">파타야 (Pattaya)</option>
+        <option value="Krabi|끄라비">끄라비 (Krabi)</option>
+        <option value="Tokyo|도쿄">도쿄 (Tokyo)</option>
+        <option value="Osaka|오사카">오사카 (Osaka)</option>
+        <option value="Fukuoka|후쿠오카">후쿠오카 (Fukuoka)</option>
+        <option value="Da Nang|다낭">다낭 (Da Nang)</option>
+        <option value="Hanoi|하노이">하노이 (Hanoi)</option>
+        <option value="Ho Chi Minh City|호치민">호치민 (Ho Chi Minh)</option>
+        <option value="Singapore|싱가포르">싱가포르 (Singapore)</option>
+        <option value="Taipei|타이베이">타이베이 (Taipei)</option>
+      </select>
+      <div class="hint" id="city-hint"></div>
+    </div>
+    <div class="field">
+      <label>카테고리당 수집 수</label>
+      <select id="gen-max" onchange="regenJson()">
+        <option value="20">20개 (테스트)</option>
+        <option value="40">40개</option>
+        <option value="60" selected>60개</option>
+        <option value="100">100개</option>
+        <option value="150">150개</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>최소 평점 (Apify 단계)</label>
+      <select id="gen-min-rating" onchange="regenJson()">
+        <option value="0">전체</option>
+        <option value="3.5">3.5+</option>
+        <option value="4.0" selected>4.0+</option>
+        <option value="4.5">4.5+</option>
+      </select>
+      <div class="hint">Apify가 수집 전 필터 — 크레딧 절약</div>
+    </div>
+    <div class="field">
+      <label>언어</label>
+      <select id="gen-lang" onchange="regenJson()">
+        <option value="ko" selected>한국어</option>
+        <option value="en">영어</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field" style="margin-bottom:10px;">
+    <label>카테고리 선택</label>
+    <div class="cat-grid" id="cat-grid"></div>
+    <div class="hint">
+      <span id="cat-count">0</span>개 선택 ·
+      <a href="#" onclick="selectAllCats(true);return false;" style="font-weight:700;">전체선택</a> ·
+      <a href="#" onclick="selectAllCats(false);return false;" style="font-weight:700;">전체해제</a>
+    </div>
+    <div id="cat-preview" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="row" style="margin-top:4px;">
+    <div class="field">
+      <label>상세페이지 스크랩 (리뷰수·영업시간)</label>
+      <select id="gen-detail" onchange="regenJson()">
+        <option value="1" selected>예 (리뷰수/영업시간 필요)</option>
+        <option value="0">아니오 (빠르지만 정보 적음)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
+    <div class="field">
+      <label>생성된 JSON <button class="btn-outline" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #ccc;cursor:pointer;" onclick="copyJson()">&#x1F4CB; 복사</button></label>
+      <pre id="apify-json" style="max-height:180px;overflow-y:auto;"></pre>
+    </div>
+  </div>
+
+  <div style="font-size:12.5px;color:#666;background:#f8f9ff;border:1px solid #dde3ff;border-radius:8px;padding:12px;margin-top:8px;line-height:1.7;">
+    <b>사용법:</b> JSON 복사 →
+    <a href="https://console.apify.com/actors/compass~crawler-google-places" target="_blank" style="color:#1a6b9a;font-weight:600;">Apify Google Maps Scraper 열기</a>
+    → 우측 상단 <b>JSON 탭</b> 클릭 → 붙여넣기 → <b>Save &amp; start</b> → 완료 후 <b>Export results → JSON</b>
+  </div>
+</div>
+
+<!-- 2단계: 저장 설정 -->
+<div class="card">
+  <div class="card-title">⚙️ 2단계 — 저장 설정</div>
+  <div class="row">
+    <div class="field">
+      <label>관리자 토큰</label>
+      <input id="admin-token" type="password" placeholder="SCRAPER_ADMIN_TOKEN" />
+      <div class="hint">Vercel 환경변수 SCRAPER_ADMIN_TOKEN 값</div>
+    </div>
+    <div class="field">
+      <label>국가 코드 (자동)</label>
+      <input id="country-code" type="text" value="TH" readonly style="background:#f0f0f0;color:#888;" />
+    </div>
+  </div>
+  <div class="hint" style="margin-top:8px;">
+    ⚠️ <b>https://trip-planner-chi-seven.vercel.app/scraper.html</b> 에서만 저장됩니다 (로컬 file:// 불가)
+  </div>
+</div>
+
+<!-- 3단계: 저장 필터 + JSON 업로드 -->
+<div class="card">
+  <div class="card-title">&#x1F4C2; 3단계 — JSON 업로드 및 저장</div>
+  <div class="row" style="margin-bottom:12px;">
+    <div class="field">
+      <label>최소 리뷰수 (저장 단계)</label>
+      <select id="gen-min-reviews">
+        <option value="0">전체</option>
+        <option value="50">50+</option>
+        <option value="100" selected>100+</option>
+        <option value="500">500+</option>
+        <option value="1000">1,000+ (유명한 곳만)</option>
+      </select>
+      <div class="hint">Apify 미지원 — 수집 후 거름</div>
+    </div>
+    <div class="field">
+      <label>숙소 제외 (맛집·관광 검색 시 권장)</label>
+      <select id="gen-skip-lodging">
+        <option value="1" selected>예 — 리조트·호텔·빌라 제외</option>
+        <option value="0">아니오 — 숙소도 포함</option>
+      </select>
+      <div class="hint">맛집 검색에 리조트가 섞이는 문제 방지</div>
+    </div>
+  </div>
+
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    &#x1F4C1; Apify 결과 JSON을 드래그하거나 클릭해서 선택
+  </div>
+  <input type="file" id="file-input" accept=".json" style="display:none;" onchange="handleFile(this.files[0])" />
+  <div id="file-info" style="font-size:12px;color:#888;margin-top:8px;"></div>
+
+  <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <button class="btn btn-primary" id="btn-import" onclick="startImport()" disabled>&#x1F4BE; Supabase에 저장</button>
+    <button class="btn btn-outline" onclick="exportCSV()">&#x1F4E5; CSV 내보내기</button>
+    <span id="status-text" style="font-size:12px;color:#888;"></span>
+  </div>
+</div>
+
+<!-- 진행 상황 -->
+<div class="card" id="progress-card" style="display:none;">
+  <div class="card-title">&#x1F4CA; 진행 상황</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="cnt-total">0</div><div class="stat-label">필터 통과</div></div>
+    <div class="stat"><div class="stat-val green" id="cnt-saved">0</div><div class="stat-label">저장 완료</div></div>
+    <div class="stat"><div class="stat-val orange" id="cnt-skip">0</div><div class="stat-label">중복 스킵</div></div>
+    <div class="stat"><div class="stat-val red" id="cnt-err">0</div><div class="stat-label">오류</div></div>
+  </div>
+  <div class="progress"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+  <div id="current-status" style="font-size:12px;color:#888;margin-bottom:8px;height:16px;"></div>
+  <div class="log" id="log"></div>
+</div>
+
+<!-- 결과 테이블 -->
+<div class="card" id="result-card" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="card-title" style="margin:0;">&#x1F4CD; 결과 <span id="result-count" style="color:#888;font-weight:400;"></span></div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>#</th><th>사진</th><th>장소명</th><th>카테고리</th><th>평점</th><th>리뷰수</th><th>주소</th><th>상태</th></tr>
+      </thead>
+      <tbody id="result-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+/* ── 도시/국가 매핑 ── */
+const CITY_COUNTRY = {
+  'Bangkok':'TH','Phuket':'TH','Chiang Mai':'TH','Pattaya':'TH','Krabi':'TH',
+  'Tokyo':'JP','Osaka':'JP','Fukuoka':'JP',
+  'Da Nang':'VN','Hanoi':'VN','Ho Chi Minh City':'VN',
+  'Singapore':'SG','Taipei':'TW',
+};
+
+/* ── 카테고리 목록 ── */
+const SCRAPE_CATEGORIES = [
+  { key:'가볼만한곳', label:'⭐ 가볼만한곳', on:true },
+  { key:'관광명소',   label:'&#x1F4CD; 관광명소',   on:true },
+  { key:'핫플레이스', label:'&#x1F525; 핫플레이스', on:false },
+  { key:'사원',       label:'&#x1F6D5; 사원',       on:true },
+  { key:'야경 명소',  label:'&#x1F303; 야경명소',   on:false },
+  { key:'맛집',       label:'&#x1F37D; 맛집',       on:true },
+  { key:'유명 맛집',  label:'&#x1F44D; 유명맛집',   on:false },
+  { key:'카페',       label:'☕ 카페',       on:true },
+  { key:'디저트 맛집',label:'&#x1F370; 디저트',     on:false },
+  { key:'길거리음식', label:'&#x1F962; 길거리음식', on:false },
+  { key:'루프탑바',   label:'&#x1F306; 루프탑바',   on:false },
+  { key:'쇼핑',       label:'&#x1F6CD; 쇼핑',       on:false },
+  { key:'야시장',     label:'&#x1F319; 야시장',     on:false },
+  { key:'스파 마사지',label:'&#x1F486; 스파마사지', on:false },
+  { key:'나이트라이프',label:'&#x1F3B5; 나이트라이프',on:false },
+  { key:'공원',       label:'&#x1F333; 공원',       on:false },
+  { key:'해변',       label:'&#x1F3D6; 해변',       on:false },
+  { key:'박물관',     label:'&#x1F3DB; 박물관',     on:false },
+  { key:'전망대',     label:'&#x1F304; 전망대',     on:false },
+  { key:'포토스팟',   label:'&#x1F4F8; 포토스팟',   on:false },
+];
+
+/* ── 카테고리 정규화 (한국어 우선) ── */
+const CAT_MAP_KO = [
+  ['리조트','&#x1F3E8; 숙소'],['호텔','&#x1F3E8; 숙소'],['풀빌라','&#x1F3E8; 숙소'],
+  ['빌라','&#x1F3E8; 숙소'],['게스트하우스','&#x1F3E8; 숙소'],['모텔','&#x1F3E8; 숙소'],
+  ['호스텔','&#x1F3E8; 숙소'],['펜션','&#x1F3E8; 숙소'],['콘도','&#x1F3E8; 숙소'],
+  ['사원','&#x1F6D5; 사원'],['사찰','&#x1F6D5; 사원'],['왓','&#x1F6D5; 사원'],
+  ['왕궁','&#x1F451; 왕궁'],['궁전','&#x1F451; 왕궁'],
+  ['카페','☕ 카페'],['커피','☕ 카페'],
+  ['음식점','&#x1F37D; 맛집'],['레스토랑','&#x1F37D; 맛집'],['식당','&#x1F37D; 맛집'],
+  ['시장','&#x1F3EE; 시장'],['야시장','&#x1F319; 야시장'],
+  ['스파','&#x1F486; 스파'],['마사지','&#x1F486; 스파'],
+  ['나이트클럽','&#x1F3B5; 나이트라이프'],['바','&#x1F3B5; 나이트라이프'],
+  ['박물관','&#x1F3DB; 박물관'],['미술관','&#x1F3DB; 박물관'],
+  ['공원','&#x1F333; 공원'],['정원','&#x1F333; 공원'],
+  ['해변','&#x1F3D6; 해변'],['비치','&#x1F3D6; 해변'],
+  ['놀이공원','&#x1F3A0; 놀이공원'],['워터파크','&#x1F3A0; 놀이공원'],
+  ['동물원','&#x1F981; 동물원'],['아쿠아리움','&#x1F420; 아쿠아리움'],
+  ['전망대','&#x1F304; 전망대'],['쇼핑몰','&#x1F6CD; 쇼핑'],['백화점','&#x1F6CD; 쇼핑'],
+  ['관광','&#x1F4CD; 관광지'],['명소','&#x1F4CD; 관광지'],
+];
+const CAT_MAP_EN = {
+  'restaurant':'&#x1F37D; 맛집','cafe':'☕ 카페','coffee shop':'☕ 카페',
+  'tourist attraction':'&#x1F4CD; 관광지','museum':'&#x1F3DB; 박물관',
+  'shopping mall':'&#x1F6CD; 쇼핑','market':'&#x1F962; 시장','night market':'&#x1F319; 야시장',
+  'spa':'&#x1F486; 스파','massage':'&#x1F486; 스파','night club':'&#x1F3B5; 나이트라이프',
+  'bar':'&#x1F3B5; 나이트라이프','rooftop bar':'&#x1F306; 루프탑','park':'&#x1F333; 공원',
+  'temple':'&#x1F6D5; 사원','buddhist temple':'&#x1F6D5; 사원','beach':'&#x1F3D6; 해변',
+  'amusement park':'&#x1F3A0; 놀이공원','water park':'&#x1F3A0; 놀이공원',
+  'lodging':'&#x1F3E8; 숙소','hotel':'&#x1F3E8; 숙소','resort':'&#x1F3E8; 숙소',
+};
+
+function normalizeCategory(item) {
+  const raw = (item.categoryName || '').toLowerCase().trim();
+  const cats = (item.categories || []).map(c => c.toLowerCase().trim());
+  for (const [kw, label] of CAT_MAP_KO) {
+    if (raw.includes(kw) || cats.some(c => c.includes(kw))) return label;
+  }
+  if (CAT_MAP_EN[raw]) return CAT_MAP_EN[raw];
+  for (const c of cats) { if (CAT_MAP_EN[c]) return CAT_MAP_EN[c]; }
+  for (const [k, v] of Object.entries(CAT_MAP_EN)) {
+    if (raw.includes(k) || cats.some(c => c.includes(k))) return v;
+  }
+  return '&#x1F4CD; ' + (item.categoryName || cats[0] || '기타');
+}
+
+/* ── 숙소 감지 ── */
+const LODGING_KW = ['리조트','호텔','풀빌라','빌라','게스트하우스','모텔','호스텔','펜션','콘도','resort','hotel','motel','hostel','lodging','villa','guesthouse'];
+function isLodging(item) {
+  const raw = (item.categoryName || '').toLowerCase();
+  const cats = (item.categories || []).map(c => c.toLowerCase());
+  return LODGING_KW.some(k => raw.includes(k) || cats.some(c => c.includes(k)));
+}
+
+/* ── 기타 유틸 ── */
+function todayHours(item) {
+  const oh = item.openingHours;
+  if (!oh) return null;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today = days[new Date().getDay()];
+  if (Array.isArray(oh)) {
+    const found = oh.find(h => (h.day || h).startsWith(today.slice(0,3)));
+    return found ? (typeof found === 'string' ? found.replace(/^[A-Za-z]+:\s*/,'') : found.hours) : null;
+  }
+  if (typeof oh === 'object') return oh[today] || null;
+  return null;
+}
+function normalizeHours(item) {
+  const oh = item.openingHours;
+  if (!oh) return null;
+  if (Array.isArray(oh)) return oh.map(h => typeof h === 'string' ? h : `${h.day}: ${h.hours}`);
+  if (typeof oh === 'object') return Object.entries(oh).map(([d,h]) => `${d}: ${h}`);
+  return null;
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function esc(s) { return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ── 상태 ── */
+let parsedData = [], adminTokenGlobal = '';
+let cntTotal=0, cntSaved=0, cntSkip=0, cntErr=0;
+
+/* ── 카테고리 그리드 ── */
+function renderCatGrid() {
+  document.getElementById('cat-grid').innerHTML = SCRAPE_CATEGORIES.map((c,i) =>
+    `<label class="cat-item ${c.on?'on':''}" data-idx="${i}">
+      <input type="checkbox" ${c.on?'checked':''} onchange="toggleCat(${i})" />${c.label}
+    </label>`
+  ).join('');
+  updateCatCount();
+}
+function toggleCat(idx) {
+  SCRAPE_CATEGORIES[idx].on = !SCRAPE_CATEGORIES[idx].on;
+  document.querySelector(`.cat-item[data-idx="${idx}"]`).classList.toggle('on', SCRAPE_CATEGORIES[idx].on);
+  updateCatCount(); regenJson();
+}
+function selectAllCats(on) {
+  SCRAPE_CATEGORIES.forEach(c => c.on = on);
+  document.querySelectorAll('.cat-item').forEach((el,i) => {
+    el.classList.toggle('on', on);
+    el.querySelector('input').checked = on;
+  });
+  updateCatCount(); regenJson();
+}
+function updateCatCount() {
+  document.getElementById('cat-count').textContent = SCRAPE_CATEGORIES.filter(c=>c.on).length;
+}
+
+/* ── JSON 생성 ── */
+function regenJson() {
+  const cityVal = document.getElementById('gen-city').value;
+  const [cityEn, cityKo] = cityVal.split('|');
+  const maxResults = document.getElementById('gen-max').value;
+  const lang = document.getElementById('gen-lang').value;
+  const minRating = parseFloat(document.getElementById('gen-min-rating').value) || 0;
+  const wantDetail = document.getElementById('gen-detail').value === '1';
+  const country = CITY_COUNTRY[cityEn] || 'TH';
+  document.getElementById('country-code').value = country;
+  document.getElementById('city-hint').textContent = `검색어: "${cityKo} 가볼만한곳" 형태`;
+
+  const selected = SCRAPE_CATEGORIES.filter(c=>c.on);
+  if (!selected.length) { document.getElementById('apify-json').textContent = '// 카테고리를 선택해주세요'; return; }
+
+  const searchTerms = selected.map(c => `${cityKo} ${c.key}`);
+  document.getElementById('cat-preview').innerHTML = searchTerms.map(t => `<span class="term-chip">${esc(t)}</span>`).join('');
+
+  const json = {
+    searchStringsArray: searchTerms,
+    locationQuery: cityEn,
+    maxCrawledPlacesPerSearch: parseInt(maxResults),
+    language: lang,
+    includeOpeningHours: true,
+    maxImages: 1,
+    skipClosedPlaces: true,
+  };
+  if (minRating > 0) json.minimumStars = String(minRating);
+  if (wantDetail) json.scrapePlaceDetailPage = true;
+
+  document.getElementById('apify-json').textContent = JSON.stringify(json, null, 2);
+}
+
+function copyJson() {
+  const text = document.getElementById('apify-json').textContent.trim();
+  if (text.startsWith('//')) { alert('카테고리를 먼저 선택해주세요.'); return; }
+  navigator.clipboard.writeText(text).then(() => alert('복사됐어요!'));
+}
+
+/* ── 드래그 앤 드롭 ── */
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file || !file.name.endsWith('.json')) { alert('JSON 파일을 선택해주세요.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const raw = JSON.parse(e.target.result);
+      parsedData = Array.isArray(raw) ? raw : [raw];
+      document.getElementById('file-info').textContent = `✓ ${file.name} — ${parsedData.length}개 항목 로드`;
+      document.getElementById('btn-import').disabled = false;
+      dropZone.innerHTML = `✅ <strong>${file.name}</strong> (${parsedData.length}개)`;
+    } catch(err) { alert('JSON 파싱 실패: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+/* ── 로그 ── */
+function log(msg, type='') {
+  const el = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = 'log-line ' + type;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+function updateStats() {
+  document.getElementById('cnt-total').textContent = cntTotal;
+  document.getElementById('cnt-saved').textContent = cntSaved;
+  document.getElementById('cnt-skip').textContent  = cntSkip;
+  document.getElementById('cnt-err').textContent   = cntErr;
+}
+
+/* ── 서버리스 API 호출 ── */
+async function checkDuplicate(placeId) {
+  const res = await fetch(`/api/import-places?google_place_id=${encodeURIComponent(placeId)}`, {
+    headers: { 'x-admin-token': adminTokenGlobal }
+  });
+  if (!res.ok) return { error: await res.text() };
+  return await res.json();
+}
+async function saveToServer(row) {
+  const res = await fetch('/api/import-places', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-token': adminTokenGlobal },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) return { error: { message: await res.text() } };
+  return { error: null };
+}
+
+/* ── 메인 임포트 ── */
+async function startImport() {
+  const adminToken = document.getElementById('admin-token').value.trim();
+  if (!adminToken) { alert('관리자 토큰을 입력해주세요.'); return; }
+  if (!parsedData.length) { alert('JSON 파일을 먼저 선택해주세요.'); return; }
+
+  const cityKo      = document.getElementById('gen-city').value.split('|')[1];
+  const country     = document.getElementById('country-code').value;
+  const minRating   = parseFloat(document.getElementById('gen-min-rating').value) || 0;
+  const minRev      = parseInt(document.getElementById('gen-min-reviews').value) || 0;
+  const skipLodging = document.getElementById('gen-skip-lodging').value === '1';
+  adminTokenGlobal  = adminToken;
+
+  cntTotal = cntSaved = cntSkip = cntErr = 0;
+  updateStats();
+  document.getElementById('progress-card').style.display = 'block';
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('result-tbody').innerHTML = '';
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('btn-import').disabled = true;
+  document.getElementById('progress-bar').style.width = '0%';
+
+  if (parsedData[0]) {
+    log(`샘플 필드: ${Object.keys(parsedData[0]).slice(0,8).join(', ')}...`, 'dim');
+    log(`샘플 — title: ${parsedData[0].title}, categoryName: ${parsedData[0].categoryName}`, 'dim');
+  }
+
+  let lodgingSkipped = 0;
+  const filtered = parsedData.filter(item => {
+    const rating = item.totalScore || 0;
+    const revs   = item.reviewsCount || 0;
+    if (minRating && rating < minRating) return false;
+    if (minRev && revs < minRev) return false;
+    if (item.permanentlyClosed || item.temporarilyClosed) return false;
+    if (skipLodging && isLodging(item)) { lodgingSkipped++; return false; }
+    return true;
+  });
+
+  cntTotal = filtered.length;
+  updateStats();
+  log(`원본 ${parsedData.length}개 → 필터 통과 ${filtered.length}개`, 'info');
+  if (skipLodging && lodgingSkipped > 0) log(`&#x1F3E8; 숙소 유형 ${lodgingSkipped}개 제외 (리조트·호텔 등)`, 'skip');
+  log(`도시: ${cityKo} | 평점 ${minRating}+ | 리뷰 ${minRev}+ | 숙소제외: ${skipLodging}`, 'info');
+
+  for (let i = 0; i < filtered.length; i++) {
+    const item = filtered[i];
+    document.getElementById('progress-bar').style.width = Math.round((i+1)/filtered.length*100) + '%';
+    document.getElementById('current-status').textContent = `(${i+1}/${filtered.length}) ${item.title}`;
+
+    const placeId = item.placeId || null;
+
+    if (placeId) {
+      const dup = await checkDuplicate(placeId);
+      if (dup.error) log(`⚠ 중복확인 실패 (계속 진행): ${typeof dup.error === 'string' ? dup.error : JSON.stringify(dup.error)}`, 'dim');
+      else if (dup.exists) {
+        log(`↩ ${item.title} — 중복 스킵`, 'skip');
+        cntSkip++; updateStats(); addRow(item, 'skip'); continue;
+      }
+    }
+
+    const category   = normalizeCategory(item);
+    const lat        = item.location?.lat ?? null;
+    const lng        = item.location?.lng ?? null;
+    const photoUrl   = item.imageUrl || item.thumbnailUrl || null;
+    const openHours  = normalizeHours(item);
+    const rating     = item.totalScore || null;
+    const revs       = item.reviewsCount || null;
+    const tags = [];
+    if (rating >= 4.5) tags.push('인기');
+    if (revs >= 1000) tags.push('많은리뷰');
+
+    const row = {
+      name: item.title, name_en: item.title, category,
+      country, city: cityKo,
+      address: item.address || null, lat, lng,
+      google_place_id: placeId,
+      google_rating: rating, review_count: revs,
+      photo_url: photoUrl, photo_ref: null,
+      price_level: typeof item.priceLevel === 'number' ? item.priceLevel : null,
+      phone: item.phone || item.phoneUnformatted || null,
+      website: item.website || null,
+      opening_hours: openHours,
+      tags: tags.length ? tags : null,
+      source: 'apify',
+    };
+
+    const { error } = await saveToServer(row);
+    if (error) {
+      log(`✗ ${item.title} — ${error.message || JSON.stringify(error)}`, 'err');
+      cntErr++; addRow(item, 'err');
+    } else {
+      log(`✓ ${item.title} (⭐${rating||'?'} · ${(revs||0).toLocaleString()}리뷰 · ${category})`, 'ok');
+      cntSaved++; addRow(item, 'saved');
+    }
+    updateStats();
+    await sleep(60);
+  }
+
+  document.getElementById('progress-bar').style.width = '100%';
+  document.getElementById('btn-import').disabled = false;
+  document.getElementById('status-text').textContent = `완료 — 저장 ${cntSaved}개`;
+  document.getElementById('current-status').textContent = '';
+  log(`\n✅ 완료 — 저장 ${cntSaved} / 중복 ${cntSkip} / 오류 ${cntErr}`, 'ok');
+  if (cntSaved + cntSkip > 0) {
+    document.getElementById('result-card').style.display = 'block';
+    document.getElementById('result-count').textContent = `(저장 ${cntSaved}개 / 중복 ${cntSkip}개)`;
+  }
+}
+
+function addRow(item, status) {
+  const tbody = document.getElementById('result-tbody');
+  const tr = document.createElement('tr');
+  const idx = tbody.children.length + 1;
+  const photo = item.imageUrl || item.thumbnailUrl || '';
+  const cat   = normalizeCategory(item);
+  const hours = todayHours(item) || '—';
+  const rating = item.totalScore || '—';
+  const revs  = (item.reviewsCount || 0).toLocaleString();
+  const bcls  = {saved:'b-saved',skip:'b-skip',err:'b-err'}[status];
+  const btxt  = {saved:'저장',skip:'중복',err:'오류'}[status];
+  tr.innerHTML = `
+    <td>${idx}</td>
+    <td>${photo?`<img class="thumb" src="${photo}" onerror="this.remove()" />`:'—'}</td>
+    <td><strong>${esc(item.title||'—')}</strong></td>
+    <td>${esc(cat)}</td>
+    <td>${rating!=='—'?`⭐ ${rating}`:'—'}</td>
+    <td>${revs}</td>
+    <td style="font-size:11px;color:#666;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.address||'—')}</td>
+    <td><span class="badge ${bcls}">${btxt}</span></td>`;
+  tbody.appendChild(tr);
+}
+
+function exportCSV() {
+  const rows = [];
+  document.querySelectorAll('#result-tbody tr').forEach(tr => {
+    rows.push([...tr.querySelectorAll('td')].map(td=>`"${td.textContent.trim().replace(/"/g,'""')}"`).join(','));
+  });
+  if (!rows.length) { alert('데이터가 없어요.'); return; }
+  const h = '"#","사진","장소명","카테고리","평점","리뷰수","주소","상태"';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff'+[h,...rows].join('\n')], {type:'text/csv;charset=utf-8'}));
+  a.download = `mongsil_places_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+}
+
+/* ── 초기화 ── */
+renderCatGrid();
+regenJson();
+</script>
+</body>
+</html>

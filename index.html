@@ -2194,9 +2194,10 @@ $('#btn-create-trip').onclick = async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (!session?.user?.id) { toast('다시 로그인해주세요.'); await sb.auth.signOut(); return; }
   user = session.user;
+  // .select('id')만 받음 — SELECT * 하면 is_trip_member 트리거 경쟁조건으로 403 발생
   const { data, error } = await sb.from('trips').insert({
     name, start_date: start, end_date: end, headcount, theme, destinations, owner_id: session.user.id
-  }).select().single();
+  }).select('id').single();
   if (error) { toast(error.message); return; }
   closeModal('modal-new-trip');
   await openTrip(data.id);

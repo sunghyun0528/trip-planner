@@ -2112,7 +2112,7 @@ async function loadTrips() {
     const firstDest = (t.destinations || [])[0] || null;
     const cityImg = firstDest ? cityImgMap[firstDest] : null;
     const bgHtml = cityImg ? `
-      <div style="position:absolute;inset:0;background-image:url('${cityImg.url}');background-size:auto 100%;background-position:${cityImg.pos};background-repeat:no-repeat;"></div>
+      <div style="position:absolute;inset:0;background-image:url('${cityImg.url}');background-size:cover;background-position:${cityImg.pos};"></div>
       <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.85) 45%,rgba(255,255,255,0.25) 75%,rgba(255,255,255,0.00) 100%);"></div>` : '';
     return `
       <div class="trip-card" data-id="${t.id}" style="position:relative;overflow:hidden;">

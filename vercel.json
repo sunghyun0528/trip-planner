@@ -1,4 +1,20 @@
 {
   "buildCommand": "sed -i 's/GMAPS_KEY_PLACEHOLDER/'\"$VITE_GOOGLE_MAPS_API_KEY\"'/g' index.html",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "headers": [
+    {
+      "source": "/(.*\\.html)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
 }
+

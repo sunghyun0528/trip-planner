@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌆 도시 이미지 관리자</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #2d2d2d; max-width: 1100px; }
+h1 { font-size: 20px; margin-bottom: 4px; }
+.sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+.card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.card-title { font-weight: 700; font-size: 14px; margin-bottom: 14px; }
+label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 4px; }
+input, select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fafafa; width: 100%; }
+input:focus, select:focus { outline: none; border-color: #2d2d2d; background: #fff; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.field { flex: 1; min-width: 180px; }
+.hint { font-size: 11.5px; color: #999; margin-top: 4px; }
+.btn { padding: 9px 18px; border-radius: 6px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.btn-primary { background: #2d2d2d; color: #fff; }
+.btn-primary:hover { background: #111; }
+.btn-primary:disabled { background: #bbb; cursor: not-allowed; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-danger { background: #fee; color: #c00; border: 1px solid #fcc; }
+.btn-danger:hover { background: #fcc; }
+.btn-secondary { background: #f0f0f0; color: #555; }
+.btn-secondary:hover { background: #e0e0e0; }
+
+/* 카드 미리보기 */
+.preview-wrap { margin-top: 14px; }
+.preview-label { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.trip-card-preview {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 22px 24px; background: #fff; border: 1px solid #e5e5e5;
+  border-radius: 12px; cursor: pointer; position: relative;
+  overflow: hidden; min-height: 90px;
+  transition: box-shadow .15s;
+}
+.trip-card-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: right center;
+  transition: opacity .3s;
+}
+.trip-card-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to right,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 45%,
+    rgba(255,255,255,0.30) 75%,
+    rgba(255,255,255,0.00) 100%
+  );
+}
+.trip-card-content { position: relative; z-index: 1; }
+.trip-card-content h3 { font-size: 22px; font-weight: 400; margin: 0 0 4px; font-family: Georgia, serif; letter-spacing: -0.02em; }
+.trip-card-content .meta { color: #888; font-size: 13px; font-weight: 500; }
+.trip-card-arrow { position: relative; z-index: 1; color: #ccc; font-size: 18px; }
+
+/* 이미지 검색 결과 */
+.img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+.img-option { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; aspect-ratio: 16/9; background: #f0f0f0; transition: all .15s; }
+.img-option:hover { border-color: #2d2d2d; transform: scale(1.02); }
+.img-option.selected { border-color: #FF7A6B; box-shadow: 0 0 0 2px #FF7A6B; }
+.img-option img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-option .credit { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 도시 목록 테이블 */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #f8f8f8; padding: 8px 10px; text-align: left; font-size: 11px; color: #888; border-bottom: 2px solid #eee; }
+td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+tr:hover td { background: #fafafa; }
+.thumb-sm { width: 80px; height: 45px; object-fit: cover; border-radius: 4px; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; }
+.badge-ok { background: #c6f6d5; color: #276749; }
+.badge-no { background: #f0f0f0; color: #888; }
+.log { background: #1a1a1a; color: #e0e0e0; border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 11.5px; max-height: 120px; overflow-y: auto; margin-top: 10px; }
+.log-line { margin: 1.5px 0; }
+.ok { color: #68d391; } .err { color: #fc8181; } .info { color: #90cdf4; }
+</style>
+</head>
+<body>
+
+<h1>🌆 도시 이미지 관리자</h1>
+<p class="sub">여행 목록 카드 배경 이미지 — Wikimedia Commons 자동 검색 + 저장</p>
+
+<!-- 인증 -->
+<div class="card" id="auth-card">
+  <div class="card-title">🔑 관리자 인증</div>
+  <div class="row">
+    <div class="field" style="max-width:340px;">
+      <label>관리자 토큰</label>
+      <input id="admin-token" type="password" placeholder="SCRAPER_ADMIN_TOKEN" />
+    </div>
+    <div style="display:flex;align-items:flex-end;">
+      <button class="btn btn-primary" onclick="authenticate()">접속</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메인 (인증 후 표시) -->
+<div id="main-content" style="display:none;">
+
+  <!-- 도시 추가/수정 -->
+  <div class="card">
+    <div class="card-title">➕ 도시 이미지 추가</div>
+    <div class="row">
+      <div class="field">
+        <label>도시명 (한국어)</label>
+        <input id="city-ko" type="text" placeholder="방콕" />
+      </div>
+      <div class="field">
+        <label>도시명 (영문)</label>
+        <input id="city-en" type="text" placeholder="Bangkok" />
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px;">
+        <button class="btn btn-secondary" onclick="searchWikipedia()">🔍 Wikipedia 자동검색</button>
+      </div>
+    </div>
+
+    <!-- Wikipedia 검색 결과 -->
+    <div id="search-result" style="display:none;">
+      <label>검색 결과 — 클릭해서 선택</label>
+      <div class="img-grid" id="img-grid"></div>
+    </div>
+
+    <!-- 직접 URL 입력 -->
+    <div class="row" style="margin-top:10px;">
+      <div class="field">
+        <label>이미지 URL (직접 입력 또는 위에서 선택)</label>
+        <input id="img-url" type="text" placeholder="https://upload.wikimedia.org/..." oninput="updatePreview()" />
+        <div class="hint">Wikimedia Commons URL 권장 (영구 무료 CC 라이선스)</div>
+      </div>
+      <div class="field">
+        <label>저작자 (CC 라이선스 표시용)</label>
+        <input id="img-credit" type="text" placeholder="Photo by … / Wikimedia Commons CC BY-SA 4.0" />
+      </div>
+    </div>
+
+    <!-- 카드 미리보기 -->
+    <div class="preview-wrap" id="preview-wrap" style="display:none;">
+      <div class="preview-label">카드 미리보기</div>
+      <div class="trip-card-preview">
+        <div class="trip-card-bg" id="preview-bg"></div>
+        <div class="trip-card-overlay"></div>
+        <div class="trip-card-content">
+          <h3 id="preview-city-name">방콕</h3>
+          <div class="meta">7월 1일 – 7월 5일 · 3명 · 맛집투어</div>
+        </div>
+        <div class="trip-card-arrow">→</div>
+      </div>
+      <!-- 배경 위치 조절 -->
+      <div style="margin-top:8px;display:flex;align-items:center;gap:12px;font-size:12px;color:#888;">
+        <span>이미지 위치:</span>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="radio" name="pos" value="right center" onchange="setPos(this.value)" checked> 우측</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="radio" name="pos" value="center center" onchange="setPos(this.value)"> 중앙</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="radio" name="pos" value="left center" onchange="setPos(this.value)"> 좌측</label>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-primary" onclick="saveCity()" id="btn-save">💾 저장</button>
+      <button class="btn btn-secondary" onclick="clearForm()">초기화</button>
+      <span id="save-status" style="font-size:12px;color:#888;"></span>
+    </div>
+    <div class="log" id="log" style="display:none;"></div>
+  </div>
+
+  <!-- 도시 목록 -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div class="card-title" style="margin:0;">📋 저장된 도시 목록 <span id="city-count" style="color:#888;font-weight:400;font-size:13px;"></span></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadCities()">↺ 새로고침</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>미리보기</th><th>한국어</th><th>영문</th><th>상태</th><th>저작자</th><th>작업</th></tr>
+        </thead>
+        <tbody id="city-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let adminToken = '';
+let selectedUrl = '';
+let selectedCredit = '';
+
+/* ─── 인증 ─── */
+function authenticate() {
+  adminToken = document.getElementById('admin-token').value.trim();
+  if (!adminToken) { alert('토큰을 입력해주세요'); return; }
+  document.getElementById('auth-card').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  loadCities();
+}
+
+/* ─── 로그 ─── */
+function log(msg, type = '') {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  const d = document.createElement('div');
+  d.className = 'log-line ' + type;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ─── Wikipedia Commons 자동 검색 ─── */
+async function searchWikipedia() {
+  const cityEn = document.getElementById('city-en').value.trim();
+  const cityKo = document.getElementById('city-ko').value.trim();
+  if (!cityEn) { alert('영문 도시명을 먼저 입력해주세요'); return; }
+
+  // 카드 미리보기 도시명 갱신
+  document.getElementById('preview-city-name').textContent = cityKo || cityEn;
+
+  const grid = document.getElementById('img-grid');
+  const wrap = document.getElementById('search-result');
+  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">검색 중...</div>';
+  wrap.style.display = 'block';
+
+  // 1. Wikipedia pageimages API로 대표 이미지 가져오기
+  const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(cityEn)}&prop=pageimages&format=json&pithumbsize=1200&origin=*`;
+
+  // 2. Wikimedia Commons에서 도시 panorama 검색
+  const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(cityEn + ' skyline panorama')}&gsrnamespace=6&gsrlimit=8&prop=imageinfo|pageimages&iiprop=url|extmetadata&iiurlwidth=600&pithumbsize=600&format=json&origin=*`;
+
+  const results = [];
+
+  try {
+    // Wikipedia 대표 이미지
+    const wr = await fetch(wikiUrl);
+    const wd = await wr.json();
+    const pages = Object.values(wd.query?.pages || {});
+    const thumb = pages[0]?.thumbnail?.source;
+    if (thumb) {
+      // thumb URL에서 원본 URL 역산
+      const original = thumb.replace(/\/thumb\//, '/').replace(/\/[^/]+$/, '');
+      results.push({ url: original || thumb, thumb, credit: `Wikimedia Commons / Wikipedia: ${cityEn}` });
+    }
+
+    // Commons 파노라마 검색
+    const cr = await fetch(commonsUrl);
+    const cd = await cr.json();
+    const cPages = Object.values(cd.query?.pages || {});
+    for (const p of cPages) {
+      const iiUrl = p.imageinfo?.[0]?.url;
+      const thumbUrl = p.imageinfo?.[0]?.thumburl;
+      const artist = p.imageinfo?.[0]?.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, '') || 'Wikimedia Commons';
+      const license = p.imageinfo?.[0]?.extmetadata?.LicenseShortName?.value || 'CC';
+      if (iiUrl) results.push({ url: iiUrl, thumb: thumbUrl || iiUrl, credit: `${artist} / ${license}` });
+    }
+  } catch(e) {
+    log(`검색 오류: ${e.message}`, 'err');
+  }
+
+  if (!results.length) {
+    grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">검색 결과가 없어요. URL을 직접 입력해주세요.</div>';
+    return;
+  }
+
+  grid.innerHTML = results.map((r, i) => `
+    <div class="img-option" onclick="selectImage('${r.url.replace(/'/g,"\\'")}', '${r.credit.replace(/'/g,"\\'")}')">
+      <img src="${r.thumb}" onerror="this.parentElement.remove()" loading="lazy" />
+      <div class="credit">${r.credit}</div>
+    </div>`).join('');
+}
+
+function selectImage(url, credit) {
+  document.querySelectorAll('.img-option').forEach(el => el.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  document.getElementById('img-url').value = url;
+  document.getElementById('img-credit').value = credit;
+  selectedUrl = url;
+  selectedCredit = credit;
+  updatePreview();
+}
+
+function updatePreview() {
+  const url = document.getElementById('img-url').value.trim();
+  const cityKo = document.getElementById('city-ko').value.trim();
+  const wrap = document.getElementById('preview-wrap');
+  const bg = document.getElementById('preview-bg');
+  document.getElementById('preview-city-name').textContent = cityKo || '도시명';
+  if (url) {
+    bg.style.backgroundImage = `url('${url}')`;
+    bg.style.backgroundPosition = 'right center';
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function setPos(val) {
+  document.getElementById('preview-bg').style.backgroundPosition = val;
+}
+
+/* ─── 저장 ─── */
+async function saveCity() {
+  const city_ko = document.getElementById('city-ko').value.trim();
+  const city_en = document.getElementById('city-en').value.trim();
+  const image_url = document.getElementById('img-url').value.trim();
+  const image_credit = document.getElementById('img-credit').value.trim();
+  if (!city_ko || !city_en || !image_url) { alert('도시명(한/영)과 이미지 URL은 필수예요'); return; }
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = '저장 중...';
+  document.getElementById('save-status').textContent = '';
+
+  try {
+    const res = await fetch('/api/city-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ city_ko, city_en, image_url, image_credit, verified: true }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    log(`✓ ${city_ko} (${city_en}) 저장 완료`, 'ok');
+    document.getElementById('save-status').textContent = '✅ 저장됨';
+    clearForm();
+    loadCities();
+  } catch(e) {
+    log(`✗ 저장 실패: ${e.message}`, 'err');
+    document.getElementById('save-status').textContent = '❌ 실패';
+  }
+  btn.disabled = false;
+  btn.textContent = '💾 저장';
+}
+
+/* ─── 도시 목록 불러오기 ─── */
+async function loadCities() {
+  const tbody = document.getElementById('city-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa;padding:16px;">불러오는 중...</td></tr>';
+  try {
+    const res = await fetch('/api/city-images');
+    const data = await res.json();
+    document.getElementById('city-count').textContent = `(${data.length}개)`;
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa;padding:16px;">아직 저장된 도시가 없어요</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td><img class="thumb-sm" src="${c.image_url}" onerror="this.remove()" loading="lazy" /></td>
+        <td><strong>${c.city_ko}</strong></td>
+        <td style="color:#888;">${c.city_en}</td>
+        <td><span class="badge ${c.verified ? 'badge-ok' : 'badge-no'}">${c.verified ? '검수완료' : '미검수'}</span></td>
+        <td style="font-size:11px;color:#aaa;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.image_credit || '—'}</td>
+        <td style="display:flex;gap:6px;align-items:center;">
+          <button class="btn btn-sm btn-secondary" onclick="editCity('${c.city_ko}','${c.city_en}','${c.image_url}','${(c.image_credit||'').replace(/'/g,"\\'")}')">수정</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteCity('${c.city_ko}')">삭제</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:#f00;">오류: ${e.message}</td></tr>`;
+  }
+}
+
+function editCity(ko, en, url, credit) {
+  document.getElementById('city-ko').value = ko;
+  document.getElementById('city-en').value = en;
+  document.getElementById('img-url').value = url;
+  document.getElementById('img-credit').value = credit;
+  updatePreview();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteCity(city_ko) {
+  if (!confirm(`"${city_ko}" 이미지를 삭제할까요?`)) return;
+  const res = await fetch(`/api/city-images?city_ko=${encodeURIComponent(city_ko)}`, {
+    method: 'DELETE', headers: { 'x-admin-token': adminToken }
+  });
+  if (res.ok) { log(`✓ ${city_ko} 삭제됨`, 'ok'); loadCities(); }
+  else { const e = await res.json(); log(`✗ ${e.error}`, 'err'); }
+}
+
+function clearForm() {
+  ['city-ko','city-en','img-url','img-credit'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('search-result').style.display = 'none';
+  document.getElementById('preview-wrap').style.display = 'none';
+}
+</script>
+</body>
+</html>

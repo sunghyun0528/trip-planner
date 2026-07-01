@@ -12,10 +12,10 @@ h1 { font-size: 20px; margin-bottom: 4px; }
 .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
 .card-title { font-weight: 700; font-size: 14px; margin-bottom: 14px; }
 label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 4px; }
-input, select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fafafa; width: 100%; }
-input:focus, select:focus { outline: none; border-color: #2d2d2d; background: #fff; }
+input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fafafa; width: 100%; }
+input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.field { flex: 1; min-width: 180px; }
+.field { flex: 1; min-width: 160px; }
 .hint { font-size: 11.5px; color: #999; margin-top: 4px; }
 .btn { padding: 9px 18px; border-radius: 6px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
 .btn-primary { background: #2d2d2d; color: #fff; }
@@ -35,19 +35,18 @@ input:focus, select:focus { outline: none; border-color: #2d2d2d; background: #f
   padding: 22px 24px; background: #fff; border: 1px solid #e5e5e5;
   border-radius: 12px; cursor: pointer; position: relative;
   overflow: hidden; min-height: 90px;
-  transition: box-shadow .15s;
 }
 .trip-card-bg {
   position: absolute; inset: 0;
-  background-size: cover; background-position: right center;
-  transition: opacity .3s;
+  background-size: cover; background-position: right top;
+  transition: background-position .2s;
 }
 .trip-card-overlay {
   position: absolute; inset: 0;
   background: linear-gradient(to right,
     rgba(255,255,255,0.96) 0%,
     rgba(255,255,255,0.85) 45%,
-    rgba(255,255,255,0.30) 75%,
+    rgba(255,255,255,0.25) 75%,
     rgba(255,255,255,0.00) 100%
   );
 }
@@ -56,15 +55,22 @@ input:focus, select:focus { outline: none; border-color: #2d2d2d; background: #f
 .trip-card-content .meta { color: #888; font-size: 13px; font-weight: 500; }
 .trip-card-arrow { position: relative; z-index: 1; color: #ccc; font-size: 18px; }
 
-/* 이미지 검색 결과 */
-.img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
-.img-option { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; aspect-ratio: 16/9; background: #f0f0f0; transition: all .15s; }
-.img-option:hover { border-color: #2d2d2d; transform: scale(1.02); }
-.img-option.selected { border-color: #FF7A6B; box-shadow: 0 0 0 2px #FF7A6B; }
-.img-option img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.img-option .credit { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 2축 위치 조절 */
+.pos-grid { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; }
+.pos-cell { width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid #ddd; background: #f8f8f8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; transition: all .15s; }
+.pos-cell:hover { border-color: #999; background: #f0f0f0; }
+.pos-cell.active { border-color: #FF7A6B; background: #FF7A6B; color: #fff; }
 
-/* 도시 목록 테이블 */
+/* 검색 결과 */
+.img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 12px; }
+.img-option { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2.5px solid transparent; aspect-ratio: 16/9; background: #f0f0f0; transition: all .15s; }
+.img-option:hover { border-color: #999; transform: scale(1.02); }
+.img-option.selected { border-color: #FF7A6B; box-shadow: 0 0 0 1px #FF7A6B; }
+.img-option img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-option .credit { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.65); color: #fff; font-size: 9px; padding: 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.img-option .quality-badge { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 3px; }
+
+/* 도시 목록 */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { background: #f8f8f8; padding: 8px 10px; text-align: left; font-size: 11px; color: #888; border-bottom: 2px solid #eee; }
 td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
@@ -73,15 +79,17 @@ tr:hover td { background: #fafafa; }
 .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; }
 .badge-ok { background: #c6f6d5; color: #276749; }
 .badge-no { background: #f0f0f0; color: #888; }
-.log { background: #1a1a1a; color: #e0e0e0; border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 11.5px; max-height: 120px; overflow-y: auto; margin-top: 10px; }
+.log { background: #1a1a1a; color: #e0e0e0; border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 11.5px; max-height: 100px; overflow-y: auto; margin-top: 10px; }
 .log-line { margin: 1.5px 0; }
 .ok { color: #68d391; } .err { color: #fc8181; } .info { color: #90cdf4; }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 
 <h1>🌆 도시 이미지 관리자</h1>
-<p class="sub">여행 목록 카드 배경 이미지 — Wikimedia Commons 자동 검색 + 저장</p>
+<p class="sub">여행 목록 카드 배경 이미지 — 랜드마크 검색 + 위치 조절 + 저장</p>
 
 <!-- 인증 -->
 <div class="card" id="auth-card">
@@ -97,42 +105,43 @@ tr:hover td { background: #fafafa; }
   </div>
 </div>
 
-<!-- 메인 (인증 후 표시) -->
 <div id="main-content" style="display:none;">
 
-  <!-- 도시 추가/수정 -->
+  <!-- 도시 추가 -->
   <div class="card">
     <div class="card-title">➕ 도시 이미지 추가</div>
+
     <div class="row">
       <div class="field">
         <label>도시명 (한국어)</label>
-        <input id="city-ko" type="text" placeholder="방콕" />
+        <input id="city-ko" type="text" placeholder="방콕" oninput="onCityKoInput()" />
       </div>
       <div class="field">
-        <label>도시명 (영문)</label>
-        <input id="city-en" type="text" placeholder="Bangkok" />
+        <label>도시명 (영문) <span id="translating" style="color:#FF7A6B;font-size:10px;display:none;">번역 중...</span></label>
+        <input id="city-en" type="text" placeholder="자동 입력됩니다" />
+        <div class="hint">한국어 입력 시 자동 변환 (매핑 테이블 → MyMemory API 순)</div>
       </div>
-      <div style="display:flex;align-items:flex-end;gap:8px;">
-        <button class="btn btn-secondary" onclick="searchWikipedia()">🔍 Wikipedia 자동검색</button>
+      <div style="display:flex;align-items:flex-end;">
+        <button class="btn btn-secondary" onclick="searchImages()" id="btn-search">🔍 이미지 검색</button>
       </div>
     </div>
 
-    <!-- Wikipedia 검색 결과 -->
+    <!-- 검색 결과 -->
     <div id="search-result" style="display:none;">
-      <label>검색 결과 — 클릭해서 선택</label>
+      <label>검색 결과 — 클릭해서 선택 <span id="result-note" style="font-weight:400;text-transform:none;letter-spacing:0;color:#aaa;"></span></label>
       <div class="img-grid" id="img-grid"></div>
     </div>
 
-    <!-- 직접 URL 입력 -->
-    <div class="row" style="margin-top:10px;">
+    <!-- URL 직접 입력 -->
+    <div class="row" style="margin-top:12px;">
       <div class="field">
-        <label>이미지 URL (직접 입력 또는 위에서 선택)</label>
+        <label>이미지 URL</label>
         <input id="img-url" type="text" placeholder="https://upload.wikimedia.org/..." oninput="updatePreview()" />
-        <div class="hint">Wikimedia Commons URL 권장 (영구 무료 CC 라이선스)</div>
+        <div class="hint">Wikimedia Commons 권장 — 영구 무료 CC 라이선스</div>
       </div>
       <div class="field">
-        <label>저작자 (CC 라이선스 표시용)</label>
-        <input id="img-credit" type="text" placeholder="Photo by … / Wikimedia Commons CC BY-SA 4.0" />
+        <label>저작자</label>
+        <input id="img-credit" type="text" placeholder="Photo by … / CC BY-SA 4.0" />
       </div>
     </div>
 
@@ -143,17 +152,24 @@ tr:hover td { background: #fafafa; }
         <div class="trip-card-bg" id="preview-bg"></div>
         <div class="trip-card-overlay"></div>
         <div class="trip-card-content">
-          <h3 id="preview-city-name">방콕</h3>
+          <h3 id="preview-city-name">도시명</h3>
           <div class="meta">7월 1일 – 7월 5일 · 3명 · 맛집투어</div>
         </div>
         <div class="trip-card-arrow">→</div>
       </div>
-      <!-- 배경 위치 조절 -->
-      <div style="margin-top:8px;display:flex;align-items:center;gap:12px;font-size:12px;color:#888;">
-        <span>이미지 위치:</span>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="radio" name="pos" value="right center" onchange="setPos(this.value)" checked> 우측</label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="radio" name="pos" value="center center" onchange="setPos(this.value)"> 중앙</label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;"><input type="radio" name="pos" value="left center" onchange="setPos(this.value)"> 좌측</label>
+
+      <!-- 2축 위치 조절 -->
+      <div style="margin-top:10px;display:flex;align-items:center;gap:14px;">
+        <div>
+          <div style="font-size:11px;color:#aaa;margin-bottom:4px;">이미지 위치</div>
+          <div class="pos-grid" id="pos-grid">
+            <!-- JS로 렌더 -->
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:#888;">
+          <span id="pos-label">우측 상단</span><br>
+          <span style="font-size:10px;color:#bbb;" id="pos-value">right top</span>
+        </div>
       </div>
     </div>
 
@@ -168,25 +184,132 @@ tr:hover td { background: #fafafa; }
   <!-- 도시 목록 -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div class="card-title" style="margin:0;">📋 저장된 도시 목록 <span id="city-count" style="color:#888;font-weight:400;font-size:13px;"></span></div>
+      <div class="card-title" style="margin:0;">📋 저장된 도시 <span id="city-count" style="color:#888;font-weight:400;font-size:13px;"></span></div>
       <button class="btn btn-secondary btn-sm" onclick="loadCities()">↺ 새로고침</button>
     </div>
     <div style="overflow-x:auto;">
       <table>
         <thead>
-          <tr><th>미리보기</th><th>한국어</th><th>영문</th><th>상태</th><th>저작자</th><th>작업</th></tr>
+          <tr><th>미리보기</th><th>한국어</th><th>영문</th><th>위치</th><th>상태</th><th>저작자</th><th>작업</th></tr>
         </thead>
         <tbody id="city-tbody"></tbody>
       </table>
     </div>
   </div>
-
 </div>
 
 <script>
 let adminToken = '';
-let selectedUrl = '';
-let selectedCredit = '';
+let currentPos = 'right top'; // 기본값 — 이미지 우측 상단 (카드 높이가 낮아 상단 보이는 게 더 자연스러움)
+
+/* ─── 위치 그리드 ─── */
+const POS_MAP = {
+  'left top':    '↖', 'center top':    '↑', 'right top':    '↗',
+  'left center': '←', 'center center': '·', 'right center': '→',
+  'left bottom': '↙', 'center bottom': '↓', 'right bottom': '↘',
+};
+const POS_LABEL = {
+  'left top': '좌측 상단', 'center top': '중앙 상단', 'right top': '우측 상단',
+  'left center': '좌측 중앙', 'center center': '정중앙', 'right center': '우측 중앙',
+  'left bottom': '좌측 하단', 'center bottom': '중앙 하단', 'right bottom': '우측 하단',
+};
+
+function renderPosGrid() {
+  document.getElementById('pos-grid').innerHTML = Object.entries(POS_MAP).map(([pos, icon]) => `
+    <div class="pos-cell ${pos === currentPos ? 'active' : ''}" title="${POS_LABEL[pos]}" onclick="setPos('${pos}')">${icon}</div>
+  `).join('');
+}
+
+function setPos(pos) {
+  currentPos = pos;
+  document.getElementById('preview-bg').style.backgroundPosition = pos;
+  document.getElementById('pos-label').textContent = POS_LABEL[pos];
+  document.getElementById('pos-value').textContent = pos;
+  renderPosGrid();
+}
+
+/* ─── 한국어 → 영문 자동변환 ─── */
+// 매핑 테이블 (여행지로 많이 쓰이는 도시)
+const KO_TO_EN = {
+  '방콕':'Bangkok','서울':'Seoul','도쿄':'Tokyo','오사카':'Osaka','파리':'Paris',
+  '런던':'London','뉴욕':'New York','베를린':'Berlin','로마':'Rome','바르셀로나':'Barcelona',
+  '암스테르담':'Amsterdam','프라하':'Prague','빈':'Vienna','이스탄불':'Istanbul',
+  '싱가포르':'Singapore','홍콩':'Hong Kong','상하이':'Shanghai','베이징':'Beijing',
+  '타이베이':'Taipei','방기':'Vientiane','하노이':'Hanoi','호치민':'Ho Chi Minh City',
+  '다낭':'Da Nang','나트랑':'Nha Trang','푸꾸옥':'Phu Quoc',
+  '발리':'Bali','자카르타':'Jakarta','쿠알라룸푸르':'Kuala Lumpur',
+  '치앙마이':'Chiang Mai','파타야':'Pattaya','푸켓':'Phuket','끄라비':'Krabi',
+  '시드니':'Sydney','멜버른':'Melbourne','오클랜드':'Auckland',
+  '두바이':'Dubai','아부다비':'Abu Dhabi','도하':'Doha',
+  '카이로':'Cairo','마라케시':'Marrakech','케이프타운':'Cape Town',
+  '뉴델리':'New Delhi','뭄바이':'Mumbai','방갈로르':'Bangalore',
+  '리스본':'Lisbon','마드리드':'Madrid','그라나다':'Granada',
+  '베네치아':'Venice','피렌체':'Florence','밀라노':'Milan','나폴리':'Naples',
+  '크라쿠프':'Krakow','바르샤바':'Warsaw','부다페스트':'Budapest',
+  '베이루트':'Beirut','텔아비브':'Tel Aviv','암만':'Amman',
+  '리마':'Lima','부에노스아이레스':'Buenos Aires','보고타':'Bogota',
+  '멕시코시티':'Mexico City','칸쿤':'Cancun',
+  '샌프란시스코':'San Francisco','로스앤젤레스':'Los Angeles','라스베이거스':'Las Vegas',
+  '시카고':'Chicago','마이애미':'Miami','보스턴':'Boston','워싱턴':'Washington DC',
+  '후쿠오카':'Fukuoka','교토':'Kyoto','나고야':'Nagoya','삿포로':'Sapporo','오키나와':'Okinawa',
+};
+
+// 도시에 특화된 랜드마크 검색어 (일반 skyline 대신 아이콘 건물로 검색)
+const CITY_LANDMARK_QUERY = {
+  'Bangkok': ['Wat Arun Bangkok', 'Grand Palace Bangkok', 'Bangkok temple night'],
+  'Tokyo': ['Senso-ji Tokyo', 'Tokyo Skytree', 'Mount Fuji Tokyo skyline'],
+  'Osaka': ['Osaka Castle', 'Dotonbori Osaka', 'Osaka night'],
+  'Kyoto': ['Fushimi Inari Kyoto', 'Kinkaku-ji Kyoto', 'Arashiyama Kyoto'],
+  'Paris': ['Eiffel Tower Paris', 'Paris night Eiffel', 'Paris Seine river'],
+  'London': ['Big Ben London', 'Tower Bridge London', 'London skyline'],
+  'Singapore': ['Marina Bay Sands Singapore', 'Gardens by the Bay Singapore', 'Singapore skyline night'],
+  'Istanbul': ['Hagia Sophia Istanbul', 'Blue Mosque Istanbul', 'Istanbul Bosphorus'],
+  'Dubai': ['Burj Khalifa Dubai', 'Dubai skyline night', 'Dubai Marina'],
+  'Taipei': ['Taipei 101', 'Taipei skyline night'],
+  'Phuket': ['Phuket beach', 'Phuket Big Buddha', 'Phuket Phi Phi'],
+  'Bali': ['Bali Tanah Lot', 'Bali rice terrace', 'Bali temple'],
+  'Ho Chi Minh City': ['Ho Chi Minh City skyline', 'Saigon river', 'Ben Thanh market'],
+  'Hanoi': ['Hanoi Hoan Kiem Lake', 'Hanoi Old Quarter', 'Ha Long Bay'],
+  'Rome': ['Colosseum Rome', 'Rome Trevi Fountain', 'Vatican Rome'],
+  'Barcelona': ['Sagrada Familia Barcelona', 'Barcelona Park Guell', 'Barcelona skyline'],
+  'Amsterdam': ['Amsterdam canal', 'Amsterdam Rijksmuseum', 'Amsterdam bridges night'],
+  'Prague': ['Prague Charles Bridge', 'Prague castle', 'Prague old town night'],
+  'New York': ['New York Manhattan skyline', 'New York Empire State', 'Brooklyn Bridge New York'],
+  'Los Angeles': ['Los Angeles Hollywood sign', 'LA skyline', 'Santa Monica Los Angeles'],
+  'Sydney': ['Sydney Opera House', 'Sydney Harbour Bridge', 'Sydney skyline'],
+  'Cairo': ['Cairo Pyramids Giza', 'Cairo sphinx', 'Cairo Nile river'],
+  'Marrakech': ['Marrakech Medina', 'Marrakech Koutoubia', 'Marrakech souk'],
+  'Beirut': ['Beirut Pigeon Rocks', 'Beirut Downtown', 'Beirut Corniche sea'],
+};
+
+let koInputTimer = null;
+function onCityKoInput() {
+  const ko = document.getElementById('city-ko').value.trim();
+  document.getElementById('preview-city-name').textContent = ko || '도시명';
+
+  // 매핑 테이블 즉시 검색
+  if (KO_TO_EN[ko]) {
+    document.getElementById('city-en').value = KO_TO_EN[ko];
+    return;
+  }
+
+  // 없으면 0.7초 뒤 MyMemory API 호출
+  clearTimeout(koInputTimer);
+  if (ko.length < 2) return;
+  koInputTimer = setTimeout(async () => {
+    document.getElementById('translating').style.display = 'inline';
+    try {
+      const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(ko)}&langpair=ko|en`);
+      const d = await r.json();
+      if (d.responseStatus === 200) {
+        // MyMemory가 도시명을 이상하게 번역할 수 있으니 첫 글자만 대문자로 정리
+        const raw = d.responseData.translatedText;
+        document.getElementById('city-en').value = raw;
+      }
+    } catch {}
+    document.getElementById('translating').style.display = 'none';
+  }, 700);
+}
 
 /* ─── 인증 ─── */
 function authenticate() {
@@ -194,6 +317,7 @@ function authenticate() {
   if (!adminToken) { alert('토큰을 입력해주세요'); return; }
   document.getElementById('auth-card').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
+  renderPosGrid();
   loadCities();
 }
 
@@ -208,94 +332,108 @@ function log(msg, type = '') {
   el.scrollTop = el.scrollHeight;
 }
 
-/* ─── Wikipedia Commons 자동 검색 ─── */
-async function searchWikipedia() {
+/* ─── 이미지 검색 ─── */
+async function searchImages() {
   const cityEn = document.getElementById('city-en').value.trim();
   const cityKo = document.getElementById('city-ko').value.trim();
-  if (!cityEn) { alert('영문 도시명을 먼저 입력해주세요'); return; }
+  if (!cityEn) { alert('도시 영문명을 먼저 입력해주세요'); return; }
 
-  // 카드 미리보기 도시명 갱신
   document.getElementById('preview-city-name').textContent = cityKo || cityEn;
+  document.getElementById('preview-wrap').style.display = 'none';
 
   const grid = document.getElementById('img-grid');
   const wrap = document.getElementById('search-result');
-  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">검색 중...</div>';
+  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;"><span class="spin">⏳</span> 검색 중...</div>';
   wrap.style.display = 'block';
+  document.getElementById('btn-search').disabled = true;
 
-  // 1. Wikipedia pageimages API로 대표 이미지 가져오기
-  const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(cityEn)}&prop=pageimages&format=json&pithumbsize=1200&origin=*`;
-
-  // 2. Wikimedia Commons에서 도시 panorama 검색
-  const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(cityEn + ' skyline panorama')}&gsrnamespace=6&gsrlimit=8&prop=imageinfo|pageimages&iiprop=url|extmetadata&iiurlwidth=600&pithumbsize=600&format=json&origin=*`;
+  // 랜드마크 특화 검색어 사용 (없으면 city 이름으로)
+  const landmarkQueries = CITY_LANDMARK_QUERY[cityEn] || [`${cityEn} landmark`, `${cityEn} famous`, cityEn];
+  document.getElementById('result-note').textContent = `"${landmarkQueries[0]}" 외 ${landmarkQueries.length - 1}개 검색어 사용`;
 
   const results = [];
+  const seen = new Set();
 
+  // 1. Wikipedia 대표 이미지 (도시 기사의 상단 이미지)
   try {
-    // Wikipedia 대표 이미지
-    const wr = await fetch(wikiUrl);
+    const wr = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(cityEn)}&prop=pageimages&format=json&pithumbsize=1200&origin=*`);
     const wd = await wr.json();
     const pages = Object.values(wd.query?.pages || {});
-    const thumb = pages[0]?.thumbnail?.source;
-    if (thumb) {
-      // thumb URL에서 원본 URL 역산
-      const original = thumb.replace(/\/thumb\//, '/').replace(/\/[^/]+$/, '');
-      results.push({ url: original || thumb, thumb, credit: `Wikimedia Commons / Wikipedia: ${cityEn}` });
+    const p = pages[0];
+    if (p?.thumbnail?.source) {
+      const src = p.thumbnail.source;
+      // 원본 URL 역산 (thumb/ 제거 + 마지막 /xxx px-파일명 제거)
+      const origUrl = src.replace(/\/thumb\//, '/').replace(/\/\d+px-[^/]+$/, '');
+      if (!seen.has(origUrl)) {
+        seen.add(origUrl);
+        results.push({ url: origUrl, thumb: src, credit: `Wikimedia Commons / Wikipedia: ${cityEn}`, quality: 'Wikipedia 대표' });
+      }
     }
+  } catch {}
 
-    // Commons 파노라마 검색
-    const cr = await fetch(commonsUrl);
-    const cd = await cr.json();
-    const cPages = Object.values(cd.query?.pages || {});
-    for (const p of cPages) {
-      const iiUrl = p.imageinfo?.[0]?.url;
-      const thumbUrl = p.imageinfo?.[0]?.thumburl;
-      const artist = p.imageinfo?.[0]?.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, '') || 'Wikimedia Commons';
-      const license = p.imageinfo?.[0]?.extmetadata?.LicenseShortName?.value || 'CC';
-      if (iiUrl) results.push({ url: iiUrl, thumb: thumbUrl || iiUrl, credit: `${artist} / ${license}` });
-    }
-  } catch(e) {
-    log(`검색 오류: ${e.message}`, 'err');
+  // 2. Wikimedia Commons 랜드마크 검색 (여러 검색어 병렬)
+  const commonsSearches = landmarkQueries.map(async q => {
+    try {
+      const r = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=5&prop=imageinfo|pageimages&iiprop=url|extmetadata&iiurlwidth=600&pithumbsize=600&format=json&origin=*`);
+      const d = await r.json();
+      return Object.values(d.query?.pages || {});
+    } catch { return []; }
+  });
+
+  const allPages = (await Promise.all(commonsSearches)).flat();
+  for (const p of allPages) {
+    const url = p.imageinfo?.[0]?.url;
+    const thumb = p.imageinfo?.[0]?.thumburl;
+    if (!url || seen.has(url)) continue;
+    // SVG, GIF, 지도 이미지 제외
+    if (url.match(/\.(svg|gif)$/i)) continue;
+    if (url.toLowerCase().includes('map') || url.toLowerCase().includes('logo')) continue;
+    seen.add(url);
+    const artist = p.imageinfo?.[0]?.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, '') || 'Unknown';
+    const license = p.imageinfo?.[0]?.extmetadata?.LicenseShortName?.value || 'CC';
+    results.push({ url, thumb: thumb || url, credit: `${artist} / ${license}`, quality: '' });
   }
+
+  document.getElementById('btn-search').disabled = false;
 
   if (!results.length) {
     grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">검색 결과가 없어요. URL을 직접 입력해주세요.</div>';
     return;
   }
 
-  grid.innerHTML = results.map((r, i) => `
-    <div class="img-option" onclick="selectImage('${r.url.replace(/'/g,"\\'")}', '${r.credit.replace(/'/g,"\\'")}')">
-      <img src="${r.thumb}" onerror="this.parentElement.remove()" loading="lazy" />
+  grid.innerHTML = results.slice(0, 12).map((r, i) => `
+    <div class="img-option" onclick="selectImage(${i})" data-url="${r.url.replace(/"/g,'&quot;')}" data-credit="${r.credit.replace(/"/g,'&quot;')}">
+      <img src="${r.thumb}" onerror="this.parentElement.style.display='none'" loading="lazy" />
+      ${r.quality ? `<div class="quality-badge">${r.quality}</div>` : ''}
       <div class="credit">${r.credit}</div>
     </div>`).join('');
 }
 
-function selectImage(url, credit) {
+function selectImage(idx) {
   document.querySelectorAll('.img-option').forEach(el => el.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
+  const el = document.querySelectorAll('.img-option')[idx];
+  el.classList.add('selected');
+  const url = el.dataset.url;
+  const credit = el.dataset.credit;
   document.getElementById('img-url').value = url;
   document.getElementById('img-credit').value = credit;
-  selectedUrl = url;
-  selectedCredit = credit;
   updatePreview();
 }
 
 function updatePreview() {
   const url = document.getElementById('img-url').value.trim();
-  const cityKo = document.getElementById('city-ko').value.trim();
+  const ko = document.getElementById('city-ko').value.trim();
   const wrap = document.getElementById('preview-wrap');
   const bg = document.getElementById('preview-bg');
-  document.getElementById('preview-city-name').textContent = cityKo || '도시명';
+  document.getElementById('preview-city-name').textContent = ko || '도시명';
   if (url) {
     bg.style.backgroundImage = `url('${url}')`;
-    bg.style.backgroundPosition = 'right center';
+    bg.style.backgroundPosition = currentPos;
     wrap.style.display = 'block';
+    renderPosGrid();
   } else {
     wrap.style.display = 'none';
   }
-}
-
-function setPos(val) {
-  document.getElementById('preview-bg').style.backgroundPosition = val;
 }
 
 /* ─── 저장 ─── */
@@ -304,18 +442,17 @@ async function saveCity() {
   const city_en = document.getElementById('city-en').value.trim();
   const image_url = document.getElementById('img-url').value.trim();
   const image_credit = document.getElementById('img-credit').value.trim();
+  const image_position = currentPos;
   if (!city_ko || !city_en || !image_url) { alert('도시명(한/영)과 이미지 URL은 필수예요'); return; }
 
-  const btn = document.getElementById('btn-save');
-  btn.disabled = true;
-  btn.textContent = '저장 중...';
-  document.getElementById('save-status').textContent = '';
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('btn-save').textContent = '저장 중...';
 
   try {
     const res = await fetch('/api/city-images', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
-      body: JSON.stringify({ city_ko, city_en, image_url, image_credit, verified: true }),
+      body: JSON.stringify({ city_ko, city_en, image_url, image_credit, image_position, verified: true }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || res.statusText);
@@ -324,64 +461,60 @@ async function saveCity() {
     clearForm();
     loadCities();
   } catch(e) {
-    log(`✗ 저장 실패: ${e.message}`, 'err');
+    log(`✗ ${e.message}`, 'err');
     document.getElementById('save-status').textContent = '❌ 실패';
   }
-  btn.disabled = false;
-  btn.textContent = '💾 저장';
+  document.getElementById('btn-save').disabled = false;
+  document.getElementById('btn-save').textContent = '💾 저장';
 }
 
-/* ─── 도시 목록 불러오기 ─── */
+/* ─── 도시 목록 ─── */
 async function loadCities() {
   const tbody = document.getElementById('city-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa;padding:16px;">불러오는 중...</td></tr>';
-  try {
-    const res = await fetch('/api/city-images');
-    const data = await res.json();
-    document.getElementById('city-count').textContent = `(${data.length}개)`;
-    if (!data.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="color:#aaa;padding:16px;">아직 저장된 도시가 없어요</td></tr>';
-      return;
-    }
-    tbody.innerHTML = data.map(c => `
-      <tr>
-        <td><img class="thumb-sm" src="${c.image_url}" onerror="this.remove()" loading="lazy" /></td>
-        <td><strong>${c.city_ko}</strong></td>
-        <td style="color:#888;">${c.city_en}</td>
-        <td><span class="badge ${c.verified ? 'badge-ok' : 'badge-no'}">${c.verified ? '검수완료' : '미검수'}</span></td>
-        <td style="font-size:11px;color:#aaa;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.image_credit || '—'}</td>
-        <td style="display:flex;gap:6px;align-items:center;">
-          <button class="btn btn-sm btn-secondary" onclick="editCity('${c.city_ko}','${c.city_en}','${c.image_url}','${(c.image_credit||'').replace(/'/g,"\\'")}')">수정</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteCity('${c.city_ko}')">삭제</button>
-        </td>
-      </tr>`).join('');
-  } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:#f00;">오류: ${e.message}</td></tr>`;
-  }
+  tbody.innerHTML = '<tr><td colspan="7" style="color:#aaa;padding:16px;">불러오는 중...</td></tr>';
+  const res = await fetch('/api/city-images');
+  const data = await res.json();
+  document.getElementById('city-count').textContent = `(${data.length}개)`;
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" style="color:#aaa;padding:16px;">아직 없어요</td></tr>'; return; }
+  tbody.innerHTML = data.map(c => `
+    <tr>
+      <td><img class="thumb-sm" src="${c.image_url}" onerror="this.remove()" loading="lazy" style="object-position:${c.image_position||'right top'}" /></td>
+      <td><strong>${c.city_ko}</strong></td>
+      <td style="color:#888;">${c.city_en}</td>
+      <td style="font-size:11px;color:#aaa;">${c.image_position || '—'}</td>
+      <td><span class="badge ${c.verified ? 'badge-ok' : 'badge-no'}">${c.verified ? '완료' : '미검수'}</span></td>
+      <td style="font-size:11px;color:#aaa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.image_credit || '—'}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-secondary" onclick="editCity(${JSON.stringify(c).replace(/"/g,'&quot;')})">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteCity('${c.city_ko}')">삭제</button>
+      </td>
+    </tr>`).join('');
 }
 
-function editCity(ko, en, url, credit) {
-  document.getElementById('city-ko').value = ko;
-  document.getElementById('city-en').value = en;
-  document.getElementById('img-url').value = url;
-  document.getElementById('img-credit').value = credit;
+function editCity(c) {
+  document.getElementById('city-ko').value = c.city_ko;
+  document.getElementById('city-en').value = c.city_en;
+  document.getElementById('img-url').value = c.image_url;
+  document.getElementById('img-credit').value = c.image_credit || '';
+  currentPos = c.image_position || 'right top';
   updatePreview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteCity(city_ko) {
-  if (!confirm(`"${city_ko}" 이미지를 삭제할까요?`)) return;
+  if (!confirm(`"${city_ko}" 삭제할까요?`)) return;
   const res = await fetch(`/api/city-images?city_ko=${encodeURIComponent(city_ko)}`, {
     method: 'DELETE', headers: { 'x-admin-token': adminToken }
   });
-  if (res.ok) { log(`✓ ${city_ko} 삭제됨`, 'ok'); loadCities(); }
-  else { const e = await res.json(); log(`✗ ${e.error}`, 'err'); }
+  res.ok ? (log(`✓ ${city_ko} 삭제`, 'ok'), loadCities()) : log('✗ 실패', 'err');
 }
 
 function clearForm() {
   ['city-ko','city-en','img-url','img-credit'].forEach(id => document.getElementById(id).value = '');
+  currentPos = 'right top';
   document.getElementById('search-result').style.display = 'none';
   document.getElementById('preview-wrap').style.display = 'none';
+  document.getElementById('save-status').textContent = '';
 }
 </script>
 </body>

@@ -40,7 +40,9 @@ input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
 }
 .trip-card-bg {
   position: absolute; inset: 0;
-  background-size: cover; background-position: right top;
+  background-size: auto 100%;    /* 높이에 맞게 비율 유지, 가로는 자동 */
+  background-position: right center; /* 이미지를 우측에 배치 */
+  background-repeat: no-repeat;
   transition: background-position .2s;
 }
 .trip-card-overlay {
@@ -58,7 +60,7 @@ input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
 .trip-card-arrow { position: relative; z-index: 1; color: #ccc; font-size: 18px; }
 
 /* 2축 위치 조절 */
-.pos-grid { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; }
+.pos-grid { display: flex; gap: 4px; }
 .pos-cell { width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid #ddd; background: #f8f8f8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; transition: all .15s; }
 .pos-cell:hover { border-color: #999; background: #f0f0f0; }
 .pos-cell.active { border-color: #FF7A6B; background: #FF7A6B; color: #fff; }
@@ -139,7 +141,7 @@ tr:hover td { background: #fafafa; }
       <div class="field">
         <label>이미지 URL</label>
         <input id="img-url" type="text" placeholder="https://upload.wikimedia.org/..." oninput="updatePreview()" />
-        <div class="hint">Unsplash raw URL 자동 입력 — 파노라마 크롭(1400×350) 적용됨</div>
+        <div class="hint">Unsplash raw URL 자동 입력 — 원본 비율 유지, CSS로 카드 높이에 맞게 축소</div>
       </div>
       <div class="field">
         <label>저작자</label>
@@ -202,23 +204,20 @@ tr:hover td { background: #fafafa; }
 
 <script>
 let adminToken = '';
-let currentPos = 'right top'; // 기본값 — 이미지 우측 상단 (카드 높이가 낮아 상단 보이는 게 더 자연스러움)
+let currentPos = 'right center'; // 기본값 — 이미지 우측 배치
 
-/* ─── 위치 그리드 ─── */
+/* ─── 위치 그리드 (좌우 3개만 — background-size:auto 100%에선 상하 의미없음) ─── */
 const POS_MAP = {
-  'left top':    '↖', 'center top':    '↑', 'right top':    '↗',
-  'left center': '←', 'center center': '·', 'right center': '→',
-  'left bottom': '↙', 'center bottom': '↓', 'right bottom': '↘',
+  'left center': '← 좌측', 'center center': '· 중앙', 'right center': '→ 우측',
 };
 const POS_LABEL = {
-  'left top': '좌측 상단', 'center top': '중앙 상단', 'right top': '우측 상단',
-  'left center': '좌측 중앙', 'center center': '정중앙', 'right center': '우측 중앙',
-  'left bottom': '좌측 하단', 'center bottom': '중앙 하단', 'right bottom': '우측 하단',
+  'left center': '좌측', 'center center': '중앙', 'right center': '우측',
 };
 
 function renderPosGrid() {
-  document.getElementById('pos-grid').innerHTML = Object.entries(POS_MAP).map(([pos, icon]) => `
-    <div class="pos-cell ${pos === currentPos ? 'active' : ''}" title="${POS_LABEL[pos]}" onclick="setPos('${pos}')">${icon}</div>
+  document.getElementById('pos-grid').innerHTML = Object.entries(POS_MAP).map(([pos, label]) => `
+    <div class="pos-cell ${pos === currentPos ? 'active' : ''}" style="width:auto;padding:0 10px;"
+         onclick="setPos('${pos}')">${label}</div>
   `).join('');
 }
 
@@ -256,16 +255,15 @@ const KO_TO_EN = {
   '후쿠오카':'Fukuoka','교토':'Kyoto','나고야':'Nagoya','삿포로':'Sapporo','오키나와':'Okinawa',
 };
 
-/* ─── Unsplash 파노라마 크롭 파라미터
-   실제 카드 치수: max-width 720px, 높이 ~87px → 비율 약 8:1
-   2배 해상도(Retina) 고려: 1440 × 180px = 8:1
-   crop=entropy: 가장 정보량 많은 영역(랜드마크) 중심으로 크롭 ─── */
-const CROP_PARAMS = 'w=1440&h=180&fit=crop&crop=entropy&auto=format&q=80';
+/* ─── Unsplash URL 파라미터
+   fit=crop 제거 — 사진을 자르지 않고 원본 비율 유지
+   w=1200으로 파일 크기만 제한 (4K 원본 그대로 받으면 너무 큼)
+   CSS에서 background-size: auto 100%로 카드 높이에 맞게 축소 ─── */
+const IMG_PARAMS = 'w=1200&auto=format&q=80';
 
-function cropUrl(rawUrl) {
-  // raw URL에 파라미터 추가 (이미 ?가 있으면 &, 없으면 ?)
+function imgUrl(rawUrl) {
   const sep = rawUrl.includes('?') ? '&' : '?';
-  return `${rawUrl}${sep}${CROP_PARAMS}`;
+  return `${rawUrl}${sep}${IMG_PARAMS}`;
 }
 
 /* ─── 이미지 검색 — Unsplash API (서버리스 프록시 경유)
@@ -308,7 +306,7 @@ async function searchImages() {
 
     // 그리드 렌더 — 썸네일은 small URL, 선택하면 raw+crop URL 저장
     grid.innerHTML = hits.map((h, i) => {
-      const previewUrl = cropUrl(h.raw); // 미리보기도 크롭된 버전
+      const previewUrl = imgUrl(h.raw); // 미리보기도 크롭된 버전
       return `
       <div class="img-option" onclick="selectImage(${i})"
            data-raw="${h.raw.replace(/"/g,'&quot;')}"
@@ -366,7 +364,7 @@ function selectImage(idx) {
   el.classList.add('selected');
   // data-raw가 있으면 Unsplash raw URL (크롭 적용), 없으면 직접 URL
   const raw = el.dataset.raw || el.dataset.url;
-  const finalUrl = raw ? cropUrl(raw) : raw;
+  const finalUrl = raw ? imgUrl(raw) : raw;
   const credit = el.dataset.credit;
   document.getElementById('img-url').value = finalUrl;
   document.getElementById('img-credit').value = credit;

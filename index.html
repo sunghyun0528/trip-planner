@@ -99,11 +99,17 @@
   .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; flex-wrap: wrap; gap: 12px; }
   .page-title { font-size: 54px; line-height: 1; margin: 0; }
   .header-actions { display: flex; gap: 8px; }
-  .trip-card { display: flex; justify-content: space-between; align-items: center; padding: 22px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); margin-bottom: 10px; cursor: pointer; transition: all .15s; }
+  /* 카드 — 패딩 제거 (각 섹션이 개별 처리) */
+  .trip-card { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); margin-bottom: 10px; cursor: pointer; transition: all .15s; overflow: hidden; }
   .trip-card:hover { border-color: var(--ink); transform: translateY(-1px); }
-  .trip-card h3 { font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400; margin: 0 0 4px; letter-spacing: -0.02em; }
-  .trip-card .meta { color: var(--mute); font-size: 13px; font-weight: 500; }
-  .trip-card .arrow { color: var(--mute-2); font-size: 18px; }
+  /* 좌측 — 여행 정보 */
+  .trip-card-info { flex: 1; padding: 20px 22px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
+  .trip-card h3 { font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400; margin: 0; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trip-card .meta { color: var(--mute); font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 우측 — 도시 이미지 (1500:400 비율 유지) */
+  .trip-card-img { width: 320px; flex-shrink: 0; background-size: 100% 100%; background-repeat: no-repeat; background-color: var(--bg); aspect-ratio: 1500/400; }
+  /* 이미지 없을 때 화살표 */
+  .trip-card .arrow { color: var(--mute-2); font-size: 18px; padding: 20px 22px; display: flex; align-items: center; }
 
   /* APP */
   #screen-app { flex-direction: column; height: 100vh; overflow: hidden; }
@@ -2111,17 +2117,17 @@ async function loadTrips() {
   list.innerHTML = trips.map(t => {
     const firstDest = (t.destinations || [])[0] || null;
     const cityImg = firstDest ? cityImgMap[firstDest] : null;
-    const bgHtml = cityImg ? `
-      <div style="position:absolute;inset:0;background-image:url('${cityImg.url}');background-size:100% 100%;background-repeat:no-repeat;"></div>
-      <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.85) 45%,rgba(255,255,255,0.25) 75%,rgba(255,255,255,0.00) 100%);"></div>` : '';
+    const metaStr = `${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}`;
     return `
-      <div class="trip-card" data-id="${t.id}" style="position:relative;overflow:hidden;">
-        ${bgHtml}
-        <div style="position:relative;z-index:1;">
+      <div class="trip-card" data-id="${t.id}">
+        <div class="trip-card-info">
           <h3>${esc(t.name)}</h3>
-          <div class="meta">${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}</div>
+          <div class="meta">${metaStr}</div>
         </div>
-        <div class="arrow" style="position:relative;z-index:1;">→</div>
+        ${cityImg
+          ? `<div class="trip-card-img" style="background-image:url('${cityImg.url}');"></div>`
+          : `<div class="arrow">→</div>`
+        }
       </div>`;
   }).join('');
   list.querySelectorAll('.trip-card').forEach(el => { el.onclick = () => openTrip(el.dataset.id); });

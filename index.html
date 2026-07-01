@@ -2097,9 +2097,11 @@ async function loadTrips() {
     fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
 
-  // 도시명 → 이미지 URL 맵 생성
+  // 도시명 → {url, position} 맵 생성
   const cityImgMap = {};
-  (imgRes || []).forEach(c => { cityImgMap[c.city_ko] = c.image_url; });
+  (imgRes || []).forEach(c => {
+    cityImgMap[c.city_ko] = { url: c.image_url, pos: c.image_position || 'right top' };
+  });
 
   const list = $('#trips-list');
   if (memberRes.error) { list.innerHTML = `<div class="empty">불러오기 오류: ${esc(memberRes.error.message)}</div>`; return; }
@@ -2108,9 +2110,9 @@ async function loadTrips() {
 
   list.innerHTML = trips.map(t => {
     const firstDest = (t.destinations || [])[0] || null;
-    const imgUrl = firstDest ? cityImgMap[firstDest] : null;
-    const bgHtml = imgUrl ? `
-      <div style="position:absolute;inset:0;background-image:url('${imgUrl}');background-size:cover;background-position:right center;"></div>
+    const cityImg = firstDest ? cityImgMap[firstDest] : null;
+    const bgHtml = cityImg ? `
+      <div style="position:absolute;inset:0;background-image:url('${cityImg.url}');background-size:cover;background-position:${cityImg.pos};"></div>
       <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.85) 45%,rgba(255,255,255,0.25) 75%,rgba(255,255,255,0.00) 100%);"></div>` : '';
     return `
       <div class="trip-card" data-id="${t.id}" style="position:relative;overflow:hidden;">

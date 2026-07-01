@@ -37,23 +37,21 @@ input:focus { outline:none; border-color:#2d2d2d; background:#fff; }
 .preview-label { font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
 /* 미리보기 — 실제 카드와 동일한 2단 구조 */
 .trip-card-preview {
-  display:flex; align-items:stretch;
+  display:flex; align-items:stretch; min-height:100px;
   background:#fff; border:1px solid #e5e5e5;
   border-radius:12px; overflow:hidden;
   width:100%; max-width:720px;
 }
 .trip-card-info-preview {
-  flex:1; padding:20px 22px;
-  display:flex; flex-direction:column; justify-content:center; gap:4px;
-  min-width:0;
+  width:240px; flex-shrink:0; padding:16px 18px;
+  display:flex; flex-direction:column; justify-content:center; gap:3px;
 }
-.trip-card-info-preview h3 { font-size:26px; font-weight:400; margin:0; font-family:'Instrument Serif',Georgia,serif; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.trip-card-info-preview .meta { color:#888; font-size:13px; font-weight:500; }
+.trip-card-info-preview h3 { font-size:22px; font-weight:400; margin:0; font-family:'Instrument Serif',Georgia,serif; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.trip-card-info-preview .meta { color:#888; font-size:12px; font-weight:500; }
 .trip-card-img-preview {
-  width:320px; flex-shrink:0;
+  flex:1;
   background-size:100% 100%; background-repeat:no-repeat;
-  background-color:#f5f5f5;
-  aspect-ratio:1500/400;
+  background-color:#f0f0f0;
 }
 
 /* 도시 목록 */
@@ -152,7 +150,7 @@ tr:hover td { background:#fafafa; }
         </div>
         <div class="trip-card-img-preview" id="preview-bg"></div>
       </div>
-      <div class="hint" style="margin-top:6px;">💡 우측 이미지 영역이 1500:400 비율 (320px × 85px). 가로로 긴 사진일수록 왜곡이 적습니다.</div>
+      <div class="hint" style="margin-top:6px;">💡 우측 이미지 영역은 나머지 공간 전체(약 480×100px). <b>16:9 비율 사진이 왜곡 가장 적어 권장</b>합니다. 가로로 넓은 사진일수록 자연스럽습니다.</div>
     </div>
 
     <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">

@@ -40,9 +40,8 @@ input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
 }
 .trip-card-bg {
   position: absolute; inset: 0;
-  background-size: auto 100%;    /* 높이에 맞게 비율 유지, 가로는 자동 */
-  background-position: right center; /* 이미지를 우측에 배치 */
-  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
   transition: background-position .2s;
 }
 .trip-card-overlay {
@@ -60,7 +59,7 @@ input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
 .trip-card-arrow { position: relative; z-index: 1; color: #ccc; font-size: 18px; }
 
 /* 2축 위치 조절 */
-.pos-grid { display: flex; gap: 4px; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; }
 .pos-cell { width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid #ddd; background: #f8f8f8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; transition: all .15s; }
 .pos-cell:hover { border-color: #999; background: #f0f0f0; }
 .pos-cell.active { border-color: #FF7A6B; background: #FF7A6B; color: #fff; }
@@ -204,20 +203,23 @@ tr:hover td { background: #fafafa; }
 
 <script>
 let adminToken = '';
-let currentPos = 'right center'; // 기본값 — 이미지 우측 배치
+let currentPos = 'center center';
 
-/* ─── 위치 그리드 (좌우 3개만 — background-size:auto 100%에선 상하 의미없음) ─── */
+/* ─── 위치 그리드 9방향 ─── */
 const POS_MAP = {
-  'left center': '← 좌측', 'center center': '· 중앙', 'right center': '→ 우측',
+  'left top':    '↖', 'center top':    '↑', 'right top':    '↗',
+  'left center': '←', 'center center': '·', 'right center': '→',
+  'left bottom': '↙', 'center bottom': '↓', 'right bottom': '↘',
 };
 const POS_LABEL = {
-  'left center': '좌측', 'center center': '중앙', 'right center': '우측',
+  'left top': '좌측 상단', 'center top': '중앙 상단', 'right top': '우측 상단',
+  'left center': '좌측 중앙', 'center center': '정중앙', 'right center': '우측 중앙',
+  'left bottom': '좌측 하단', 'center bottom': '중앙 하단', 'right bottom': '우측 하단',
 };
 
 function renderPosGrid() {
-  document.getElementById('pos-grid').innerHTML = Object.entries(POS_MAP).map(([pos, label]) => `
-    <div class="pos-cell ${pos === currentPos ? 'active' : ''}" style="width:auto;padding:0 10px;"
-         onclick="setPos('${pos}')">${label}</div>
+  document.getElementById('pos-grid').innerHTML = Object.entries(POS_MAP).map(([pos, icon]) => `
+    <div class="pos-cell ${pos === currentPos ? 'active' : ''}" title="${POS_LABEL[pos]}" onclick="setPos('${pos}')">${icon}</div>
   `).join('');
 }
 
@@ -255,19 +257,15 @@ const KO_TO_EN = {
   '후쿠오카':'Fukuoka','교토':'Kyoto','나고야':'Nagoya','삿포로':'Sapporo','오키나와':'Okinawa',
 };
 
-/* ─── Unsplash URL 파라미터
-   fit=crop 제거 — 사진을 자르지 않고 원본 비율 유지
-   w=1200으로 파일 크기만 제한 (4K 원본 그대로 받으면 너무 큼)
-   CSS에서 background-size: auto 100%로 카드 높이에 맞게 축소 ─── */
-const IMG_PARAMS = 'w=1200&auto=format&q=80';
+/* ─── Unsplash URL 파라미터 — 너비 제한만, 자르지 않음 ─── */
+const IMG_PARAMS = 'w=1600&auto=format&q=80';
 
 function imgUrl(rawUrl) {
   const sep = rawUrl.includes('?') ? '&' : '?';
   return `${rawUrl}${sep}${IMG_PARAMS}`;
 }
 
-/* ─── 이미지 검색 — Unsplash API (서버리스 프록시 경유)
-   orientation=landscape + crop 파라미터로 카드 비율에 최적화 ─── */
+/* ─── 이미지 검색 — Unsplash API (비율 필터 포함) ─── */
 async function searchImages() {
   const cityEn = document.getElementById('city-en').value.trim();
   const cityKo = document.getElementById('city-ko').value.trim();
@@ -278,47 +276,51 @@ async function searchImages() {
 
   const grid = document.getElementById('img-grid');
   const wrap = document.getElementById('search-result');
-  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;"><span class="spin">⏳</span> Unsplash에서 가로형 랜드마크 이미지 검색 중...</div>';
+  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;"><span class="spin">⏳</span> Unsplash에서 넓은 사진 검색 중...</div>';
   wrap.style.display = 'block';
   document.getElementById('btn-search').disabled = true;
 
-  // 검색어: "도시명 landmark" — 가로형(landscape)만 반환
-  const query = `${cityEn} landmark`;
-  document.getElementById('result-note').textContent = `"${query}" · 가로형 · 인기순`;
+  // "panoramic skyline" 추가 — 넓은 사진이 검색될 가능성 높임
+  const query = `${cityEn} panoramic skyline landmark`;
+  document.getElementById('result-note').textContent = `"${query}" 검색 중...`;
 
   try {
-    const r = await fetch(`/api/unsplash?query=${encodeURIComponent(query)}&count=16`);
-    if (!r.ok) {
-      const err = await r.json();
-      throw new Error(err.error || r.statusText);
-    }
+    // count 30개 요청 → 비율 필터 후 최대 16개 표시
+    const r = await fetch(`/api/unsplash?query=${encodeURIComponent(query)}&count=30`);
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error || r.statusText); }
     const data = await r.json();
-    const hits = data.hits || [];
+
+    // 비율 필터: 가로/세로 >= 1.8 이상만 (진짜 넓은 사진)
+    // 1.33 = 4:3(일반), 1.78 = 16:9(와이드), 2.0+ = 파노라마
+    const MIN_RATIO = 1.8;
+    const filtered = (data.hits || []).filter(h => h.width / h.height >= MIN_RATIO);
+    const shown = filtered.length ? filtered : (data.hits || []); // 없으면 필터 없이
 
     document.getElementById('btn-search').disabled = false;
+    document.getElementById('result-note').textContent =
+      `${(data.hits||[]).length}개 중 비율 ${MIN_RATIO}:1 이상 ${filtered.length}개 필터됨`;
 
-    if (!hits.length) {
-      grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">결과가 없어요. 영문 도시명을 확인하거나 URL을 직접 입력해주세요.</div>';
+    if (!shown.length) {
+      grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">결과가 없어요.</div>';
       return;
     }
 
-    document.getElementById('result-note').textContent = `"${query}" 검색 결과 ${hits.length}개 · Unsplash`;
-
-    // 그리드 렌더 — 썸네일은 small URL, 선택하면 raw+crop URL 저장
-    grid.innerHTML = hits.map((h, i) => {
-      const previewUrl = imgUrl(h.raw); // 미리보기도 크롭된 버전
+    grid.innerHTML = shown.slice(0, 16).map((h, i) => {
+      const ratio = (h.width / h.height).toFixed(1);
+      const isPanoramic = h.width / h.height >= 2.0;
       return `
       <div class="img-option" onclick="selectImage(${i})"
            data-raw="${h.raw.replace(/"/g,'&quot;')}"
            data-credit="${h.credit.replace(/"/g,'&quot;')}">
         <img src="${h.thumb}" onerror="this.parentElement.style.display='none'" loading="lazy" />
-        <div class="credit">${h.credit}</div>
+        ${isPanoramic ? '<div class="quality-badge">🌅 파노라마</div>' : ''}
+        <div class="credit">${ratio}:1 · ${h.credit}</div>
       </div>`;
     }).join('');
   } catch(e) {
-    log(`Unsplash 검색 오류: ${e.message}`, 'err');
+    log(`오류: ${e.message}`, 'err');
     document.getElementById('btn-search').disabled = false;
-    grid.innerHTML = `<div style="color:#f00;font-size:13px;padding:10px;">오류: ${e.message}</div>`;
+    grid.innerHTML = `<div style="color:#f00;font-size:13px;padding:10px;">${e.message}</div>`;
   }
 }
 let koInputTimer = null;

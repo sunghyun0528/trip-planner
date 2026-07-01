@@ -100,16 +100,16 @@
   .page-title { font-size: 54px; line-height: 1; margin: 0; }
   .header-actions { display: flex; gap: 8px; }
   /* 카드 — 패딩 제거 (각 섹션이 개별 처리) */
-  .trip-card { display: flex; align-items: stretch; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); margin-bottom: 10px; cursor: pointer; transition: all .15s; overflow: hidden; }
+  .trip-card { display: flex; align-items: stretch; min-height: 100px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); margin-bottom: 10px; cursor: pointer; transition: all .15s; overflow: hidden; }
   .trip-card:hover { border-color: var(--ink); transform: translateY(-1px); }
-  /* 좌측 — 여행 정보 */
-  .trip-card-info { flex: 1; padding: 20px 22px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
-  .trip-card h3 { font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400; margin: 0; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .trip-card .meta { color: var(--mute); font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* 우측 — 도시 이미지 (1500:400 비율 유지) */
-  .trip-card-img { width: 320px; flex-shrink: 0; background-size: 100% 100%; background-repeat: no-repeat; background-color: var(--bg); aspect-ratio: 1500/400; }
+  /* 좌측 — 타이트한 정보 영역 */
+  .trip-card-info { width: 240px; flex-shrink: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+  .trip-card h3 { font-family: 'Instrument Serif', serif; font-size: 22px; font-weight: 400; margin: 0; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trip-card .meta { color: var(--mute); font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 우측 — 이미지 (나머지 공간 전부) */
+  .trip-card-img { flex: 1; background-size: 100% 100%; background-repeat: no-repeat; background-color: var(--bg); }
   /* 이미지 없을 때 화살표 */
-  .trip-card .arrow { color: var(--mute-2); font-size: 18px; padding: 20px 22px; display: flex; align-items: center; }
+  .trip-card .arrow { color: var(--mute-2); font-size: 18px; padding: 0 20px; display: flex; align-items: center; }
 
   /* APP */
   #screen-app { flex-direction: column; height: 100vh; overflow: hidden; }

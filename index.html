@@ -718,7 +718,10 @@
     <div id="trips-list"></div>
     <div style="margin-top:32px;text-align:center;">
       <button class="btn btn-ghost" id="btn-logout">로그아웃</button>
-      <a href="/scraper.html" target="_blank" style="display:block;margin-top:10px;font-size:11px;color:var(--mute-2);text-decoration:none;">⚙ 장소 DB 관리자</a>
+      <div style="margin-top:10px;display:flex;gap:12px;justify-content:center;">
+        <a href="/scraper.html" target="_blank" style="font-size:11px;color:var(--mute-2);text-decoration:none;">⚙ 장소 DB 관리자</a>
+        <a href="/city-images-admin.html" target="_blank" style="font-size:11px;color:var(--mute-2);text-decoration:none;">🌆 도시 이미지 관리자</a>
+      </div>
     </div>
   </div>
 </div>
@@ -2084,21 +2087,41 @@ $('#btn-save-trip-edit').onclick = async () => {
 async function loadTrips() {
   const uid = await currentUid();
   if (!uid) return;
-  // 내가 멤버인 여행만 가져오기 (trip_members 조인)
-  const { data, error } = await sb
-    .from('trip_members')
-    .select('trip_id, trips(*)')
-    .eq('user_id', uid)
-    .order('created_at', { ascending: false, referencedTable: 'trips' });
+
+  // 도시 이미지 + 내 여행 목록 병렬 로딩
+  const [memberRes, imgRes] = await Promise.all([
+    sb.from('trip_members')
+      .select('trip_id, trips(*)')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false, referencedTable: 'trips' }),
+    fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []),
+  ]);
+
+  // 도시명 → 이미지 URL 맵 생성
+  const cityImgMap = {};
+  (imgRes || []).forEach(c => { cityImgMap[c.city_ko] = c.image_url; });
+
   const list = $('#trips-list');
-  if (error) { list.innerHTML = `<div class="empty">불러오기 오류: ${esc(error.message)}</div>`; return; }
-  const trips = (data || []).map(row => row.trips).filter(Boolean);
+  if (memberRes.error) { list.innerHTML = `<div class="empty">불러오기 오류: ${esc(memberRes.error.message)}</div>`; return; }
+  const trips = (memberRes.data || []).map(row => row.trips).filter(Boolean);
   if (!trips.length) { list.innerHTML = '<div class="empty">아직 여행이 없네요. 첫 여행을 만들어보세요 ✨</div>'; return; }
-  list.innerHTML = trips.map(t => `
-    <div class="trip-card" data-id="${t.id}">
-      <div><h3>${esc(t.name)}</h3><div class="meta">${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}</div></div>
-      <div class="arrow">→</div>
-    </div>`).join('');
+
+  list.innerHTML = trips.map(t => {
+    const firstDest = (t.destinations || [])[0] || null;
+    const imgUrl = firstDest ? cityImgMap[firstDest] : null;
+    const bgHtml = imgUrl ? `
+      <div style="position:absolute;inset:0;background-image:url('${imgUrl}');background-size:cover;background-position:right center;"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.85) 45%,rgba(255,255,255,0.25) 75%,rgba(255,255,255,0.00) 100%);"></div>` : '';
+    return `
+      <div class="trip-card" data-id="${t.id}" style="position:relative;overflow:hidden;">
+        ${bgHtml}
+        <div style="position:relative;z-index:1;">
+          <h3>${esc(t.name)}</h3>
+          <div class="meta">${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}</div>
+        </div>
+        <div class="arrow" style="position:relative;z-index:1;">→</div>
+      </div>`;
+  }).join('');
   list.querySelectorAll('.trip-card').forEach(el => { el.onclick = () => openTrip(el.dataset.id); });
 }
 

@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   // GET — 전체 목록 (인증 불필요, index.html 카드 표시용)
   if (req.method === 'GET') {
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/city_images?select=city_ko,city_en,image_url,image_credit,verified&order=city_ko`,
+      `${SUPABASE_URL}/rest/v1/city_images?select=city_ko,city_en,image_url,image_position,image_credit,verified&order=city_ko`,
       { headers }
     );
     const data = await r.json();
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
   // POST — 추가 또는 수정 (city_ko가 이미 있으면 덮어쓰기)
   if (req.method === 'POST') {
-    const { city_ko, city_en, image_url, image_credit, verified } = req.body;
+    const { city_ko, city_en, image_url, image_credit, image_position, verified } = req.body;
     if (!city_ko || !city_en || !image_url) {
       res.status(400).json({ error: 'city_ko, city_en, image_url 필수' }); return;
     }
@@ -48,6 +48,7 @@ export default async function handler(req, res) {
       headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify({
         city_ko, city_en, image_url,
+        image_position: image_position || 'right top',
         image_credit: image_credit || null,
         verified: verified || false,
         updated_at: new Date().toISOString(),

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🌆 도시 이미지 관리자</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; }
 body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f5f5; color: #2d2d2d; max-width: 1100px; }
@@ -32,9 +33,10 @@ input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
 .preview-label { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
 .trip-card-preview {
   display: flex; justify-content: space-between; align-items: center;
+  /* 실제 나의 여행 페이지 카드와 동일한 치수 */
   padding: 22px 24px; background: #fff; border: 1px solid #e5e5e5;
-  border-radius: 12px; cursor: pointer; position: relative;
-  overflow: hidden; min-height: 90px;
+  border-radius: 12px; cursor: default; position: relative;
+  overflow: hidden; width: 100%; max-width: 720px;
 }
 .trip-card-bg {
   position: absolute; inset: 0;
@@ -51,7 +53,7 @@ input:focus { outline: none; border-color: #2d2d2d; background: #fff; }
   );
 }
 .trip-card-content { position: relative; z-index: 1; }
-.trip-card-content h3 { font-size: 22px; font-weight: 400; margin: 0 0 4px; font-family: Georgia, serif; letter-spacing: -0.02em; }
+.trip-card-content h3 { font-size: 26px; font-weight: 400; margin: 0 0 4px; font-family: 'Instrument Serif', Georgia, serif; letter-spacing: -0.02em; }
 .trip-card-content .meta { color: #888; font-size: 13px; font-weight: 500; }
 .trip-card-arrow { position: relative; z-index: 1; color: #ccc; font-size: 18px; }
 
@@ -255,9 +257,10 @@ const KO_TO_EN = {
 };
 
 /* ─── Unsplash 파노라마 크롭 파라미터
-   카드 비율(약 4:1)에 맞게 잘라주는 URL 파라미터
-   Unsplash raw URL + 이 파라미터 = 서버사이드 리얼타임 크롭 ─── */
-const CROP_PARAMS = 'w=1400&h=350&fit=crop&crop=entropy&auto=format&q=80';
+   실제 카드 치수: max-width 720px, 높이 ~87px → 비율 약 8:1
+   2배 해상도(Retina) 고려: 1440 × 180px = 8:1
+   crop=entropy: 가장 정보량 많은 영역(랜드마크) 중심으로 크롭 ─── */
+const CROP_PARAMS = 'w=1440&h=180&fit=crop&crop=entropy&auto=format&q=80';
 
 function cropUrl(rawUrl) {
   // raw URL에 파라미터 추가 (이미 ?가 있으면 &, 없으면 ?)

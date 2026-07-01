@@ -117,9 +117,9 @@ tr:hover td { background: #fafafa; }
         <input id="city-ko" type="text" placeholder="방콕" oninput="onCityKoInput()" />
       </div>
       <div class="field">
-        <label>도시명 (영문) <span id="translating" style="color:#FF7A6B;font-size:10px;display:none;">번역 중...</span></label>
-        <input id="city-en" type="text" placeholder="자동 입력됩니다" />
-        <div class="hint">한국어 입력 시 자동 변환 (매핑 테이블 → MyMemory API 순)</div>
+        <label>도시명 (영문)</label>
+        <input id="city-en" type="text" placeholder="Bangkok" />
+        <div class="hint">목록에 없는 도시는 영문명을 직접 입력해주세요</div>
       </div>
       <div style="display:flex;align-items:flex-end;">
         <button class="btn btn-secondary" onclick="searchImages()" id="btn-search">🔍 이미지 검색</button>
@@ -137,7 +137,7 @@ tr:hover td { background: #fafafa; }
       <div class="field">
         <label>이미지 URL</label>
         <input id="img-url" type="text" placeholder="https://upload.wikimedia.org/..." oninput="updatePreview()" />
-        <div class="hint">Wikimedia Commons 권장 — 영구 무료 CC 라이선스</div>
+        <div class="hint">Unsplash raw URL 자동 입력 — 파노라마 크롭(1400×350) 적용됨</div>
       </div>
       <div class="field">
         <label>저작자</label>
@@ -254,9 +254,19 @@ const KO_TO_EN = {
   '후쿠오카':'Fukuoka','교토':'Kyoto','나고야':'Nagoya','삿포로':'Sapporo','오키나와':'Okinawa',
 };
 
-/* ─── 이미지 검색 — Wikipedia 편집자 큐레이션 방식 (하드코딩 0개, 모든 도시 지원)
-   Wikipedia 도시 기사에 쓰인 이미지 = 편집자들이 선별한 랜드마크 사진들
-   en.wikipedia.org/api/rest_v1/page/media-list/{city} → 기사 내 모든 이미지 반환 ─── */
+/* ─── Unsplash 파노라마 크롭 파라미터
+   카드 비율(약 4:1)에 맞게 잘라주는 URL 파라미터
+   Unsplash raw URL + 이 파라미터 = 서버사이드 리얼타임 크롭 ─── */
+const CROP_PARAMS = 'w=1400&h=350&fit=crop&crop=entropy&auto=format&q=80';
+
+function cropUrl(rawUrl) {
+  // raw URL에 파라미터 추가 (이미 ?가 있으면 &, 없으면 ?)
+  const sep = rawUrl.includes('?') ? '&' : '?';
+  return `${rawUrl}${sep}${CROP_PARAMS}`;
+}
+
+/* ─── 이미지 검색 — Unsplash API (서버리스 프록시 경유)
+   orientation=landscape + crop 파라미터로 카드 비율에 최적화 ─── */
 async function searchImages() {
   const cityEn = document.getElementById('city-en').value.trim();
   const cityKo = document.getElementById('city-ko').value.trim();
@@ -267,100 +277,61 @@ async function searchImages() {
 
   const grid = document.getElementById('img-grid');
   const wrap = document.getElementById('search-result');
-  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;"><span class="spin">⏳</span> Wikipedia에서 랜드마크 이미지 불러오는 중...</div>';
+  grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;"><span class="spin">⏳</span> Unsplash에서 가로형 랜드마크 이미지 검색 중...</div>';
   wrap.style.display = 'block';
   document.getElementById('btn-search').disabled = true;
-  document.getElementById('result-note').textContent = `Wikipedia "${cityEn}" 기사의 큐레이션 이미지`;
 
-  const results = [];
-  const seen = new Set();
-
-  // 불필요한 이미지 필터 (지도, 국기, 로고, 아이콘, 문장, 위성사진 등)
-  const SKIP_PATTERN = /map|flag|coat|logo|icon|seal|emblem|locator|blank|stub|portal|wikivoyage|commons-logo|symbol|badge|patch|insignia|silhouette|pictogram/i;
+  // 검색어: "도시명 landmark" — 가로형(landscape)만 반환
+  const query = `${cityEn} landmark`;
+  document.getElementById('result-note').textContent = `"${query}" · 가로형 · 인기순`;
 
   try {
-    // Wikipedia REST API — 도시 기사의 모든 미디어 목록
-    // 이 기사에 쓰인 이미지들은 Wikipedia 편집자들이 직접 선별한 대표 랜드마크
-    const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/media-list/${encodeURIComponent(cityEn)}`);
-    if (!r.ok) throw new Error(`Wikipedia API 오류: ${r.status}`);
-    const d = await r.json();
-    const items = (d.items || []).filter(x => x.type === 'image');
-
-    for (const item of items) {
-      // 가장 큰 srcset 이미지 사용 (= 원본에 가장 가까운 것)
-      const srcset = item.srcset || [];
-      const best = srcset[srcset.length - 1]; // srcset의 마지막 = 가장 큰 것
-      const thumb = srcset[0]; // 썸네일 = 가장 작은 것 (빠른 로딩)
-      if (!best?.src) continue;
-
-      // https: 상대경로 처리
-      const url = best.src.startsWith('//') ? 'https:' + best.src : best.src;
-      const thumbUrl = thumb?.src ? (thumb.src.startsWith('//') ? 'https:' + thumb.src : thumb.src) : url;
-
-      if (seen.has(url)) continue;
-      // 지도, 국기, 아이콘 등 제외
-      const title = item.title || '';
-      if (SKIP_PATTERN.test(title)) continue;
-      // 너무 작은 이미지 제외 (32px 이하 = 아이콘류)
-      if (item.width && item.width < 100) continue;
-      // SVG 제외 (벡터 그래픽 = 대부분 지도/아이콘)
-      if (url.match(/\.svg(\?|$)/i)) continue;
-
-      seen.add(url);
-      const caption = item.caption?.text?.replace(/<[^>]+>/g, '').trim() || '';
-      results.push({
-        url, thumb: thumbUrl,
-        credit: caption || `Wikimedia Commons via Wikipedia: ${cityEn}`,
-        section: item.section_id === 0 ? '도입부' : '',
-      });
+    const r = await fetch(`/api/unsplash?query=${encodeURIComponent(query)}&count=16`);
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.error || r.statusText);
     }
+    const data = await r.json();
+    const hits = data.hits || [];
+
+    document.getElementById('btn-search').disabled = false;
+
+    if (!hits.length) {
+      grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">결과가 없어요. 영문 도시명을 확인하거나 URL을 직접 입력해주세요.</div>';
+      return;
+    }
+
+    document.getElementById('result-note').textContent = `"${query}" 검색 결과 ${hits.length}개 · Unsplash`;
+
+    // 그리드 렌더 — 썸네일은 small URL, 선택하면 raw+crop URL 저장
+    grid.innerHTML = hits.map((h, i) => {
+      const previewUrl = cropUrl(h.raw); // 미리보기도 크롭된 버전
+      return `
+      <div class="img-option" onclick="selectImage(${i})"
+           data-raw="${h.raw.replace(/"/g,'&quot;')}"
+           data-credit="${h.credit.replace(/"/g,'&quot;')}">
+        <img src="${h.thumb}" onerror="this.parentElement.style.display='none'" loading="lazy" />
+        <div class="credit">${h.credit}</div>
+      </div>`;
+    }).join('');
   } catch(e) {
-    log(`Wikipedia 검색 오류: ${e.message}`, 'err');
+    log(`Unsplash 검색 오류: ${e.message}`, 'err');
+    document.getElementById('btn-search').disabled = false;
+    grid.innerHTML = `<div style="color:#f00;font-size:13px;padding:10px;">오류: ${e.message}</div>`;
   }
-
-  document.getElementById('btn-search').disabled = false;
-
-  if (!results.length) {
-    grid.innerHTML = '<div style="color:#888;font-size:13px;padding:10px;">이미지를 찾지 못했어요. 도시 영문명을 확인하거나 URL을 직접 입력해주세요.</div>';
-    return;
-  }
-
-  document.getElementById('result-note').textContent = `Wikipedia "${cityEn}" 기사에서 ${results.length}개 이미지 발견`;
-
-  grid.innerHTML = results.slice(0, 16).map((r, i) => `
-    <div class="img-option" onclick="selectImage(${i})" data-url="${r.url.replace(/"/g,'&quot;')}" data-credit="${r.credit.replace(/"/g,'&quot;')}">
-      <img src="${r.thumb}" onerror="this.parentElement.style.display='none'" loading="lazy" />
-      ${r.section === '도입부' ? `<div class="quality-badge">도입부 ⭐</div>` : ''}
-      <div class="credit">${r.credit}</div>
-    </div>`).join('');
 }
 let koInputTimer = null;
 function onCityKoInput() {
   const ko = document.getElementById('city-ko').value.trim();
   document.getElementById('preview-city-name').textContent = ko || '도시명';
 
-  // 매핑 테이블 즉시 검색
+  // 매핑 테이블에서 즉시 변환
   if (KO_TO_EN[ko]) {
     document.getElementById('city-en').value = KO_TO_EN[ko];
-    return;
+  } else {
+    // 매핑에 없으면 비워두고 직접 입력 유도
+    document.getElementById('city-en').value = '';
   }
-
-  // 없으면 0.7초 뒤 MyMemory API 호출
-  clearTimeout(koInputTimer);
-  if (ko.length < 2) return;
-  koInputTimer = setTimeout(async () => {
-    document.getElementById('translating').style.display = 'inline';
-    try {
-      const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(ko)}&langpair=ko|en`);
-      const d = await r.json();
-      if (d.responseStatus === 200) {
-        // MyMemory가 도시명을 이상하게 번역할 수 있으니 첫 글자만 대문자로 정리
-        const raw = d.responseData.translatedText;
-        document.getElementById('city-en').value = raw;
-      }
-    } catch {}
-    document.getElementById('translating').style.display = 'none';
-  }, 700);
 }
 
 /* ─── 인증 ─── */
@@ -390,9 +361,11 @@ function selectImage(idx) {
   document.querySelectorAll('.img-option').forEach(el => el.classList.remove('selected'));
   const el = document.querySelectorAll('.img-option')[idx];
   el.classList.add('selected');
-  const url = el.dataset.url;
+  // data-raw가 있으면 Unsplash raw URL (크롭 적용), 없으면 직접 URL
+  const raw = el.dataset.raw || el.dataset.url;
+  const finalUrl = raw ? cropUrl(raw) : raw;
   const credit = el.dataset.credit;
-  document.getElementById('img-url').value = url;
+  document.getElementById('img-url').value = finalUrl;
   document.getElementById('img-credit').value = credit;
   updatePreview();
 }

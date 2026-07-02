@@ -1832,7 +1832,36 @@ function toast(msg, ms = 2200) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), ms);
 }
-function showScreen(id) { $$('.screen').forEach(s => s.classList.remove('active')); $('#' + id).classList.add('active'); }
+function showScreen(id, addHistory = true) {
+  $$('.screen').forEach(s => s.classList.remove('active'));
+  $('#' + id).classList.add('active');
+  // 브라우저 히스토리에 현재 화면 상태 기록
+  // screen-auth는 히스토리 안 남김 (로그인 화면으로 뒤로가기 방지)
+  if (addHistory && id !== 'screen-auth') {
+    history.pushState({ screen: id }, '', location.pathname);
+  }
+}
+
+// 뒤로가기 버튼 처리
+window.addEventListener('popstate', (e) => {
+  const screen = e.state?.screen;
+  if (!screen) {
+    // 히스토리 바닥 = 로그인 화면으로 가려는 것
+    // 로그인 상태면 여행 목록으로 되돌림
+    if (user) {
+      history.pushState({ screen: 'screen-trips' }, '', location.pathname);
+      showScreen('screen-trips', false);
+    }
+    return;
+  }
+  // screen-app → screen-trips 뒤로가기
+  if (screen === 'screen-trips') {
+    currentTrip = null;
+    showScreen('screen-trips', false);
+  } else {
+    showScreen(screen, false);
+  }
+});
 function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
 function fmtDate(d) { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); return `${dt.getMonth()+1}월 ${dt.getDate()}일`; }
@@ -2094,12 +2123,14 @@ function renderWeatherCard() {
   </div>`;
 }
 async function bootstrap() {
+  // 초기 히스토리 상태 설정 (뒤로가기 바닥 기준점)
+  history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
   const { data: { session } } = await sb.auth.getSession();
   if (session) await handleSignedIn(session.user);
   else {
     const code = new URLSearchParams(location.search).get('join');
     if (code) localStorage.setItem('pending_join', code);
-    showScreen('screen-auth');
+    showScreen('screen-auth', false);
   }
 }
 
@@ -2143,7 +2174,11 @@ $('#btn-logout').onclick = async () => {
 
 sb.auth.onAuthStateChange(async (event, session) => {
   if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !user) await handleSignedIn(session.user);
-  if (event === 'SIGNED_OUT') { user = null; currentTrip = null; showScreen('screen-auth'); }
+  if (event === 'SIGNED_OUT') {
+    user = null; currentTrip = null;
+    history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
+    showScreen('screen-auth', false);
+  }
 });
 
 /* 편집 모달 열기 — 헤더 클릭과 '편집' 버튼 둘 다 이 함수를 씀 */

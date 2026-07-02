@@ -679,6 +679,9 @@
   .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line-2); border-top-color: var(--ink); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* 사이드바 열기 버튼 — 기본 숨김 (모바일 미디어쿼리에서 표시) */
+  #btn-sidebar-open { display: none; padding: 6px 10px; font-size: 18px; }
+
   @media (max-width: 820px) {
     /* 컨테이너 여백 축소 */
     #screen-trips { padding: 32px 16px 80px; }
@@ -713,7 +716,7 @@
     #btn-back { padding: 6px 8px; font-size: 16px; min-width: 32px; }
     .trip-name { font-size: 17px; }
     .trip-meta { font-size: 11px; white-space: nowrap; }
-    #btn-invite { display: none; }
+    #btn-invite { display: flex; padding: 6px 10px; font-size: 12px; }
     .member-stack { display: none; }
     #btn-map-toggle { padding: 6px 10px; font-size: 12px; }
     #btn-sidebar-open { display: flex; }
@@ -747,8 +750,6 @@
     #screen-trips { padding: 48px 24px 80px; }
   }
 
-  /* 모바일 사이드바 (기본: 숨김) */
-  #btn-sidebar-open { display: none; padding: 6px 10px; font-size: 18px; }
   .m-sidebar {
     position: fixed; top: 0; left: 0; bottom: 0;
     width: 300px; max-width: 85vw;

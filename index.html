@@ -1157,26 +1157,6 @@ const SUPABASE_URL = 'https://izmlenodqnvisymjnlyg.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_v_ScByLsW_mC5Pzoyx1iAw_J2V0SGkR';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-/* ── 인증 리스너를 createClient 직후 즉시 등록 ──
-   createClient 호출 시 Supabase가 localStorage에서 세션을 복원하고
-   INITIAL_SESSION 이벤트를 발생시키는데, 이 리스너가 먼저 등록돼 있어야
-   새로고침 후에도 세션을 잡을 수 있음 ── */
-sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'INITIAL_SESSION') {
-    if (session && !user) await handleSignedIn(session.user);
-    else if (!session && !user) showScreen('screen-auth', false);
-    return;
-  }
-  if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !user) {
-    await handleSignedIn(session.user);
-  }
-  if (event === 'SIGNED_OUT') {
-    user = null; currentTrip = null;
-    history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
-    showScreen('screen-auth', false);
-  }
-});
 let user = null;
 let currentTrip = null;
 let savedPlaces = [];
@@ -2144,14 +2124,10 @@ function renderWeatherCard() {
 }
 async function bootstrap() {
   history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
-  // 초대 코드 보존
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
-  // onAuthStateChange의 INITIAL_SESSION 이벤트가 세션 복원을 담당
-  // getSession()은 INITIAL_SESSION이 발생 안 할 때의 폴백
-  const { data: { session } } = await sb.auth.getSession();
-  if (session && !user) await handleSignedIn(session.user);
-  else if (!session && !user) showScreen('screen-auth', false);
+  // 화면 판단은 onAuthStateChange의 INITIAL_SESSION에 전적으로 맡김
+  // 여기서 직접 showScreen하지 않음 — 0.1초 안에 INITIAL_SESSION 이벤트가 발생함
 }
 
 async function handleSignedIn(u) {
@@ -3923,6 +3899,24 @@ $$('[data-close]').forEach(b => b.onclick = () => b.closest('.modal-bg').classLi
 $$('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { $$('.modal-bg.active').forEach(m => m.classList.remove('active')); $('#map-overlay').classList.remove('active'); }});
 
+/* ── 인증 리스너 — 모든 함수 정의 후, bootstrap 직전에 등록 ──
+   INITIAL_SESSION 이벤트는 콜백이 비동기로 실행되므로
+   스크립트 파싱 완료 후 호출됨 → 함수 정의 문제 없음 ── */
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'INITIAL_SESSION') {
+    if (session && !user) await handleSignedIn(session.user);
+    else if (!session && !user) showScreen('screen-auth', false);
+    return;
+  }
+  if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !user) {
+    await handleSignedIn(session.user);
+  }
+  if (event === 'SIGNED_OUT') {
+    user = null; currentTrip = null;
+    history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
+    showScreen('screen-auth', false);
+  }
+});
 bootstrap();
 
 </script>

@@ -107,9 +107,10 @@
   .trip-card-del:hover { background: rgba(220,50,50,0.85); }
   .trip-card:hover .trip-card-del { display: flex; }
   /* 좌측 — 타이트한 정보 영역 */
-  .trip-card-info { width: 260px; flex-shrink: 0; padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .trip-card-info { width: 260px; flex-shrink: 0; padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
   .trip-card h3 { font-family: 'Instrument Serif', serif; font-size: 28px; font-weight: 400; margin: 0; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .trip-card .meta { color: var(--mute); font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trip-card .meta-extra { color: var(--mute-2); font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* 우측 — 이미지 (나머지 공간 전부) */
   .trip-card-img { flex: 1; background-size: 100% 100%; background-repeat: no-repeat; background-color: var(--bg); }
   /* 이미지 없을 때 화살표 */
@@ -683,28 +684,8 @@
     #screen-trips { padding: 32px 16px 80px; }
     .main-content { padding: 12px 12px 100px; }
 
-    /* 모바일에서 좌측+중앙 패널을 세로 배치 */
-    .app-body { flex-direction: column; overflow: auto; }
-    .panel-center { overflow: visible; }
-
-    /* 장소 검색 패널 — 상단 접이식으로 항상 접근 가능 */
-    .panel-left {
-      display: flex; flex-direction: column;
-      width: 100%; max-height: 60px; border-right: none;
-      border-bottom: 1px solid var(--line);
-      overflow: hidden; transition: max-height .25s ease;
-      flex-shrink: 0;
-    }
-    .panel-left.m-expanded { max-height: 70vh; overflow-y: auto; }
-    /* 검색 헤더 클릭 시 확장 */
-    .panel-left::before {
-      content: '🔍 장소 검색·추천 ▾';
-      display: block; padding: 18px 20px;
-      font-size: 14px; font-weight: 700; color: var(--ink);
-      cursor: pointer; background: var(--surface);
-      position: sticky; top: 0; z-index: 5;
-    }
-    .panel-left.m-expanded::before { content: '🔍 장소 검색·추천 ▴'; border-bottom: 1px solid var(--line); }
+    /* 모바일에서 panel-left 데스크탑용 숨김 (사이드바로 대체) */
+    .panel-left { display: none !important; }
 
     /* 대시보드 */
     .dashboard { grid-template-columns: repeat(2, 1fr); }
@@ -716,13 +697,32 @@
     .auth-title { font-size: 38px; }
 
     /* 여행 카드 — 모바일에서 스크린샷과 동일하게 (좌 38% : 우 62%) */
-    .trip-card-info { width: 38% !important; flex-shrink: 0 !important; padding: 12px 14px; }
-    .trip-card h3 { font-size: 20px; }
+    .trip-card-info { width: 38% !important; flex-shrink: 0 !important; padding: 10px 12px; }
+    .trip-card h3 { font-size: 18px; margin-bottom: 1px; }
     .trip-card .meta { font-size: 11px; }
+    .trip-card .meta-extra { font-size: 11px; }
     .trip-card-img { flex: 1 !important; width: auto !important; }
 
     /* 지도 오버레이 */
     .map-overlay { inset: 53px 0 0 0; }
+
+    /* 헤더 — 날짜 짤림 방지 */
+    .app-header { padding: 8px 12px; gap: 8px; }
+    .h-left { gap: 6px; flex: 1; min-width: 0; }
+    .h-right { gap: 6px; flex-shrink: 0; }
+    #btn-back { padding: 6px 8px; font-size: 16px; min-width: 32px; }
+    .trip-name { font-size: 17px; }
+    .trip-meta { font-size: 11px; white-space: nowrap; }
+    #btn-invite { display: none; }
+    .member-stack { display: none; }
+    #btn-map-toggle { padding: 6px 10px; font-size: 12px; }
+    #btn-sidebar-open { display: flex; }
+
+    /* 모바일 사이드바 */
+    .m-sidebar-overlay { display: block; }
+    .m-sidebar { transform: translateX(-100%); }
+    .m-sidebar.open { transform: translateX(0); }
+    .m-sidebar-overlay.open { opacity: 1; pointer-events: auto; }
 
     /* 모바일 지도 토글 */
     .mobile-toggle { display: flex; position: fixed; bottom: 20px; right: 16px; gap: 8px; z-index: 200; }
@@ -746,6 +746,32 @@
     .main-content { padding: 16px 24px 80px; max-width: 1100px; }
     #screen-trips { padding: 48px 24px 80px; }
   }
+
+  /* 모바일 사이드바 (기본: 숨김) */
+  #btn-sidebar-open { display: none; padding: 6px 10px; font-size: 18px; }
+  .m-sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 300px; max-width: 85vw;
+    background: var(--surface); z-index: 500;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .m-sidebar.open { transform: translateX(0); }
+  .m-sidebar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+  }
+  .m-sidebar-header h2 { font-size: 15px; font-weight: 700; margin: 0; }
+  #btn-sidebar-close { font-size: 20px; padding: 4px 8px; border: none; background: none; cursor: pointer; color: var(--mute); }
+  .m-sidebar-body { flex: 1; overflow-y: auto; }
+  .m-sidebar-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.3); z-index: 499;
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .m-sidebar-overlay.open { opacity: 1; pointer-events: auto; }
 
   .mobile-toggle { display: none; }
 </style>
@@ -796,6 +822,7 @@
   <header class="app-header">
     <div class="h-left">
       <button class="btn btn-ghost" id="btn-back" title="여행 목록">←</button>
+      <button id="btn-sidebar-open" class="btn btn-ghost" title="메뉴">☰</button>
       <div style="min-width: 0; cursor: pointer;" id="btn-edit-trip-header" title="여행 정보 수정">
         <div class="trip-name" id="current-name"></div>
         <div class="trip-meta" id="current-meta" style="display:flex;align-items:center;gap:6px;">
@@ -810,6 +837,35 @@
       <button class="btn btn-secondary btn-sm" id="btn-invite">초대</button>
     </div>
   </header>
+
+  <!-- 모바일 사이드바 -->
+  <div class="m-sidebar-overlay" id="m-sidebar-overlay"></div>
+  <div class="m-sidebar" id="m-sidebar">
+    <div class="m-sidebar-header">
+      <h2>📍 메뉴</h2>
+      <button id="btn-sidebar-close">×</button>
+    </div>
+    <div class="m-sidebar-body">
+      <!-- 장소 검색 섹션 (panel-left 내용 그대로) -->
+      <div style="padding:14px;">
+        <div class="search-help" style="font-size:13px;color:var(--mute);margin-bottom:10px;">가고 싶은 곳을 검색하면 바로 저장돼요 🔍</div>
+        <div class="search-box">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" class="search-input" id="paste-input-mobile" placeholder="카오산 로드, 왓포 사원..." autocomplete="off" />
+          <div class="places-dropdown" id="places-dropdown-mobile"></div>
+        </div>
+        <div class="manual-add" id="btn-manual-add-mobile" style="margin-top:8px;">✍️ 일단 이름만 적고 나중에</div>
+      </div>
+      <!-- 저장 장소 목록 -->
+      <div style="padding:0 14px 14px;">
+        <div class="panel-header" style="padding:8px 0;">
+          <span class="panel-title">📍 가보고싶은 곳</span>
+          <span class="panel-count" id="saved-count-mobile">0</span>
+        </div>
+        <div id="saved-list-mobile"></div>
+      </div>
+    </div>
+  </div>
 
   <div class="app-body">
     <aside class="panel panel-left" id="panel-left">
@@ -2175,13 +2231,15 @@ async function loadTrips() {
   list.innerHTML = trips.map(t => {
     const firstDest = (t.destinations || [])[0] || null;
     const cityImg = firstDest ? cityImgMap[firstDest] : null;
-    const metaStr = `${esc(fmtDateRange(t.start_date, t.end_date))}${t.headcount ? ` · ${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}`;
+    const metaDate  = esc(fmtDateRange(t.start_date, t.end_date));
+    const metaExtra = `${t.headcount ? `${t.headcount}명` : ''}${t.theme ? ` · ${esc(t.theme)}` : ''}`.trim();
     return `
       <div class="trip-card" data-id="${t.id}" style="position:relative;">
         <button class="trip-card-del" data-del-trip="${t.id}" title="여행 삭제">×</button>
         <div class="trip-card-info">
           <h3>${esc(t.name)}</h3>
-          <div class="meta">${metaStr}</div>
+          <div class="meta">${metaDate}</div>
+          ${metaExtra ? `<div class="meta meta-extra">${metaExtra}</div>` : ''}
         </div>
         ${cityImg
           ? `<div class="trip-card-img" style="background-image:url('${cityImg.url}');"></div>`
@@ -3797,6 +3855,21 @@ $('#panel-left')?.addEventListener('click', (e) => {
   }
 });
 $('#btn-mobile-map')?.addEventListener('click', openMap);
+
+/* 모바일 사이드바 */
+function openSidebar() {
+  $('#m-sidebar')?.classList.add('open');
+  $('#m-sidebar-overlay')?.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  $('#m-sidebar')?.classList.remove('open');
+  $('#m-sidebar-overlay')?.classList.remove('open');
+  document.body.style.overflow = '';
+}
+$('#btn-sidebar-open')?.addEventListener('click', openSidebar);
+$('#btn-sidebar-close')?.addEventListener('click', closeSidebar);
+$('#m-sidebar-overlay')?.addEventListener('click', closeSidebar);
 
 /* ============== MODAL CLOSE ============== */
 $$('[data-close]').forEach(b => b.onclick = () => b.closest('.modal-bg').classList.remove('active'));

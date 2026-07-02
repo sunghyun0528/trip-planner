@@ -235,6 +235,50 @@
   .postit-btn-row { display: flex; gap: 4px; }
   .postit-btn { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.55); transition: background .15s; }
   .postit-btn:hover { background: rgba(255,255,255,0.9); }
+  .postit-btn-ai { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.55); color: var(--coral); transition: all .15s; }
+  .postit-btn-ai:hover { background: rgba(255,255,255,0.95); }
+  .postit-btn-ai.loading { opacity: 0.6; pointer-events: none; }
+
+  /* 꿀팁 인라인 섹션 — 포스트잇 카드 안에 펼쳐짐 */
+  .tip-section {
+    display: none;
+    margin-top: 10px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+    padding-top: 10px;
+  }
+  .tip-section.open { display: block; }
+  .tip-row {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .tip-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .tip-icon { font-size: 13px; flex-shrink: 0; width: 20px; text-align: center; margin-top: 1px; }
+  .tip-content { flex: 1; min-width: 0; }
+  .tip-label { font-size: 9.5px; font-weight: 700; color: rgba(0,0,0,0.35); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .tip-text { font-size: 12px; color: #2d2d2d; line-height: 1.5; font-weight: 400; }
+
+  /* 근처 추천 (접이식) */
+  .nearby-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 8px; padding: 6px 0 0;
+    border-top: 1px solid rgba(0,0,0,0.07);
+    cursor: pointer; font-size: 11.5px; font-weight: 700; color: #555;
+  }
+  .nearby-toggle-arrow { font-size: 10px; color: #bbb; transition: transform .2s; }
+  .nearby-toggle.open .nearby-toggle-arrow { transform: rotate(180deg); }
+  .nearby-list { display: none; margin-top: 6px; }
+  .nearby-list.open { display: block; }
+  .nearby-item {
+    display: flex; align-items: flex-start; gap: 7px;
+    padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .nearby-item:last-child { border-bottom: none; }
+  .nearby-type { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 999px; flex-shrink: 0; margin-top: 1px; }
+  .nearby-type.restaurant { background: #FFF0EC; color: #c0392b; }
+  .nearby-type.cafe { background: #FFF8EC; color: #b07a00; }
+  .nearby-name { font-size: 12px; font-weight: 600; color: #1a1a1a; }
+  .nearby-desc { font-size: 11px; color: #999; margin-top: 1px; }
   .postit-x { position: absolute; top: 8px; right: 8px; font-size: 14px; padding: 4px 5px; line-height: 1; border-radius: 4px; z-index: 2; background: rgba(255,255,255,0.75); opacity: 0.7; backdrop-filter: blur(2px); }
   .postit-x:hover { opacity: 1; background: rgba(255,255,255,0.95); }
 
@@ -2169,6 +2213,121 @@ $('#btn-logout').onclick = async () => {
 };
 
 /* 편집 모달 열기 — 헤더 클릭과 '편집' 버튼 둘 다 이 함수를 씀 */
+/* ══════════════════════════════════════════
+   AI 꿀팁 — 인라인 접이식 (포스트잇 카드 내부)
+   ══════════════════════════════════════════ */
+const TIP_ICONS = {
+  timing:    { icon: '⏰', label: '방문 타이밍' },
+  cost:      { icon: '💰', label: '비용 정보' },
+  highlight: { icon: '⭐', label: '핵심 포인트' },
+  regret:    { icon: '😬', label: '후회하는 것' },
+  tip:       { icon: '💡', label: '현지 꿀팁' },
+};
+
+// 꿀팁 버튼 클릭 — 같은 카드 안에서 펼치기/접기
+async function toggleTip(placeId, btn) {
+  const section = $(`#tip-${placeId}`);
+  if (!section) return;
+
+  // 이미 열려있으면 접기
+  if (section.classList.contains('open')) {
+    section.classList.remove('open');
+    btn.textContent = '✦ 꿀팁';
+    return;
+  }
+
+  // 이미 내용 있으면 그냥 펼치기 (재조회 안 함)
+  if (section.innerHTML.trim()) {
+    section.classList.add('open');
+    btn.textContent = '✦ 접기';
+    return;
+  }
+
+  // 최초 로딩
+  btn.textContent = '불러오는 중...';
+  btn.classList.add('loading');
+  section.innerHTML = `<div style="padding:8px 0;text-align:center;color:#bbb;font-size:12px;">✦ 꿀팁 불러오는 중...</div>`;
+  section.classList.add('open');
+
+  const allowed = await trackApiCall('gemini');
+  if (!allowed) {
+    section.innerHTML = `<div style="padding:8px 0;font-size:12px;color:#aaa;">오늘 꿀팁 한도를 초과했어요 😅</div>`;
+    btn.textContent = '✦ 꿀팁'; btn.classList.remove('loading'); return;
+  }
+
+  const place = savedPlaces.find(p => p.id === placeId);
+  if (!place) { btn.textContent = '✦ 꿀팁'; btn.classList.remove('loading'); return; }
+
+  try {
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: place.name, category: place.category,
+        address: place.address, rating: place.google_rating,
+        review_count: place.review_count,
+        city: (currentTrip?.destinations || [])[0] || '',
+      }),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderTipSection(section, data);
+    btn.textContent = '✦ 접기';
+  } catch(e) {
+    section.innerHTML = `<div style="padding:8px 0;font-size:12px;color:#aaa;">꿀팁을 불러오지 못했어요 😢</div>`;
+    btn.textContent = '✦ 꿀팁';
+    console.error('[꿀팁]', e.message);
+  }
+  btn.classList.remove('loading');
+}
+
+function renderTipSection(section, data) {
+  const rows = Object.entries(TIP_ICONS).map(([key, { icon, label }]) => {
+    const text = data[key];
+    if (!text) return '';
+    return `<div class="tip-row">
+      <div class="tip-icon">${icon}</div>
+      <div class="tip-content">
+        <div class="tip-label">${label}</div>
+        <div class="tip-text">${esc(text)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 근처 추천 (접이식)
+  let nearbyHtml = '';
+  const nearby = data.nearby;
+  if (nearby?.length) {
+    const id = 'nr-' + Math.random().toString(36).slice(2, 7);
+    const items = nearby.map(n => {
+      const isCafe = (n.type || '').includes('카페');
+      return `<div class="nearby-item">
+        <span class="nearby-type ${isCafe ? 'cafe' : 'restaurant'}">${isCafe ? '카페' : '식당'}</span>
+        <div>
+          <div class="nearby-name">${esc(n.name || '—')}</div>
+          <div class="nearby-desc">${esc(n.desc || '')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    nearbyHtml = `
+      <div class="nearby-toggle" onclick="this.classList.toggle('open');document.getElementById('${id}').classList.toggle('open')">
+        <span>📍 근처 추천</span>
+        <span class="nearby-toggle-arrow">▼</span>
+      </div>
+      <div class="nearby-list" id="${id}">${items}</div>`;
+  }
+
+  section.innerHTML = rows + nearbyHtml;
+}
+
+// 이벤트 위임
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-tip-btn]');
+  if (!btn) return;
+  toggleTip(btn.dataset.tipBtn, btn);
+});
+
 function openEditTrip() {
   if (!currentTrip) return;
   $('#et-name').value         = currentTrip.name        || '';
@@ -2560,7 +2719,9 @@ function renderSaved() {
           <div class="postit-btn-row">
             <a class="postit-btn" href="${googleMapsLink(p)}" target="_blank" rel="noopener">구글맵</a>
             <button class="postit-btn" data-add-itin="${p.id}">+ 일정</button>
+            <button class="postit-btn-ai" data-tip-btn="${p.id}" title="AI 꿀팁">✦ 꿀팁</button>
           </div>
+          <div class="tip-section" id="tip-${p.id}"></div>
         </div>
       </div>`;
   }).join('')}</div>`;

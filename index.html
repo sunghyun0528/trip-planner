@@ -715,11 +715,11 @@
     .page-title { font-size: 38px; }
     .auth-title { font-size: 38px; }
 
-    /* 여행 카드 — 모바일에선 flex 비율로 (좌 3 : 우 2) */
-    .trip-card-info { width: auto; flex: 3; min-width: 0; padding: 12px 14px; }
-    .trip-card h3 { font-size: 22px; }
-    .trip-card .meta { font-size: 12px; }
-    .trip-card-img { flex: 2; }
+    /* 여행 카드 — 모바일에서 스크린샷과 동일하게 (좌 38% : 우 62%) */
+    .trip-card-info { width: 38% !important; flex-shrink: 0 !important; padding: 12px 14px; }
+    .trip-card h3 { font-size: 20px; }
+    .trip-card .meta { font-size: 11px; }
+    .trip-card-img { flex: 1 !important; width: auto !important; }
 
     /* 지도 오버레이 */
     .map-overlay { inset: 53px 0 0 0; }

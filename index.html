@@ -683,12 +683,17 @@
     #screen-trips { padding: 32px 16px 80px; }
     .main-content { padding: 12px 12px 100px; }
 
+    /* 모바일에서 좌측+중앙 패널을 세로 배치 */
+    .app-body { flex-direction: column; overflow: auto; }
+    .panel-center { overflow: visible; }
+
     /* 장소 검색 패널 — 상단 접이식으로 항상 접근 가능 */
     .panel-left {
       display: flex; flex-direction: column;
       width: 100%; max-height: 60px; border-right: none;
       border-bottom: 1px solid var(--line);
       overflow: hidden; transition: max-height .25s ease;
+      flex-shrink: 0;
     }
     .panel-left.m-expanded { max-height: 70vh; overflow-y: auto; }
     /* 검색 헤더 클릭 시 확장 */
@@ -710,10 +715,11 @@
     .page-title { font-size: 38px; }
     .auth-title { font-size: 38px; }
 
-    /* 여행 카드 — 좌측 유동적으로 */
-    .trip-card-info { width: auto; flex: 1; min-width: 0; padding: 14px 16px; }
-    .trip-card h3 { font-size: 24px; }
-    .trip-card-img { width: 130px; flex-shrink: 0; }
+    /* 여행 카드 — 모바일에선 flex 비율로 (좌 3 : 우 2) */
+    .trip-card-info { width: auto; flex: 3; min-width: 0; padding: 12px 14px; }
+    .trip-card h3 { font-size: 22px; }
+    .trip-card .meta { font-size: 12px; }
+    .trip-card-img { flex: 2; }
 
     /* 지도 오버레이 */
     .map-overlay { inset: 53px 0 0 0; }

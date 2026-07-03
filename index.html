@@ -731,8 +731,7 @@
     #screen-trips { padding: 32px 16px 80px; }
     .main-content { padding: 12px 12px 100px; }
 
-    /* 모바일에서 panel-left 데스크탑용 숨김 (사이드바로 대체) */
-    .panel-left { display: none !important; }
+    /* panel-left는 JS(initSidebar)가 모바일/데스크탑에서 위치를 제어 */
 
     /* 대시보드 */
     .dashboard { grid-template-columns: repeat(2, 1fr); }
@@ -890,25 +889,8 @@
       <h2>📍 메뉴</h2>
       <button id="btn-sidebar-close">×</button>
     </div>
-    <div class="m-sidebar-body">
-      <!-- 장소 검색 섹션 (panel-left 내용 그대로) -->
-      <div style="padding:14px;">
-        <div class="search-help" style="font-size:13px;color:var(--mute);margin-bottom:10px;">가고 싶은 곳을 검색하면 바로 저장돼요 🔍</div>
-        <div class="search-box">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input type="text" class="search-input" id="paste-input-mobile" placeholder="카오산 로드, 왓포 사원..." autocomplete="off" />
-          <div class="places-dropdown" id="places-dropdown-mobile"></div>
-        </div>
-        <div class="manual-add" id="btn-manual-add-mobile" style="margin-top:8px;">✍️ 일단 이름만 적고 나중에</div>
-      </div>
-      <!-- 저장 장소 목록 -->
-      <div style="padding:0 14px 14px;">
-        <div class="panel-header" style="padding:8px 0;">
-          <span class="panel-title">📍 가보고싶은 곳</span>
-          <span class="panel-count" id="saved-count-mobile">0</span>
-        </div>
-        <div id="saved-list-mobile"></div>
-      </div>
+    <div class="m-sidebar-body" id="m-sidebar-body">
+      <!-- panel-left가 JS로 여기에 이동됩니다 -->
     </div>
   </div>
 
@@ -2386,27 +2368,34 @@ $('#btn-save-trip-edit').onclick = async () => {
 };
 
 /* ============== TRIPS LIST ============== */
-let cityImgCache = null; // city images 메모리 캐시 — 앱 실행 중 한 번만 fetch
+let cityImgCache = null; // city images 메모리 캐시
 
 async function loadTrips() {
   const uid = await currentUid();
   if (!uid) return;
 
-  // city images는 캐시된 값 있으면 재사용 (매번 API 호출 방지)
-  const cityImagesPromise = cityImgCache
-    ? Promise.resolve(cityImgCache)
-    : fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []);
+  // city images — localStorage 캐시 우선 (새로고침해도 재호출 안 함)
+  // 도시 이미지는 자주 바뀌지 않으므로 24시간 캐시
+  if (!cityImgCache) {
+    const cached = localStorage.getItem('cityImgCache');
+    const cachedAt = localStorage.getItem('cityImgCacheAt');
+    const ONE_DAY = 86400000;
+    if (cached && cachedAt && Date.now() - Number(cachedAt) < ONE_DAY) {
+      cityImgCache = JSON.parse(cached);
+    } else {
+      const fresh = await fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []);
+      cityImgCache = fresh;
+      localStorage.setItem('cityImgCache', JSON.stringify(fresh));
+      localStorage.setItem('cityImgCacheAt', Date.now());
+    }
+  }
 
-  const [memberRes, imgRes] = await Promise.all([
-    sb.from('trip_members')
-      .select('trip_id, trips(*)')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false, referencedTable: 'trips' }),
-    cityImagesPromise,
-  ]);
+  const memberRes = await sb.from('trip_members')
+    .select('trip_id, trips(*)')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false, referencedTable: 'trips' });
 
-  // 캐시 저장
-  if (!cityImgCache) cityImgCache = imgRes;
+  const imgRes = cityImgCache;
 
   // 도시명 → {url, position} 맵 생성
   const cityImgMap = {};
@@ -2531,6 +2520,7 @@ async function openTrip(tripId) {
   $('#trip-theme').value = trip.theme || '';
   $('#trip-destinations').value = (trip.destinations || []).join(', ');
   showScreen('screen-app');
+  initSidebar(); // 모바일이면 panel-left를 사이드바로 이동
   await upsertMyMemberInfo();
   await Promise.all([loadMembers(), loadSavedPlaces(), loadMyLikes(), loadItinerary(), loadChecklists(), loadLinks(), loadExpenses(), fetchExchangeRates()]);
   renderDashboard();
@@ -4049,8 +4039,34 @@ $('#panel-left')?.addEventListener('click', (e) => {
 });
 $('#btn-mobile-map')?.addEventListener('click', openMap);
 
-/* 모바일 사이드바 */
+/* 모바일 사이드바 — panel-left를 실제로 이동시켜서 동일한 검색/목록 사용 */
+function initSidebar() {
+  const sidebarBody = $('#m-sidebar-body');
+  const panelLeft   = $('#panel-left');
+  if (!sidebarBody || !panelLeft) return;
+
+  if (window.innerWidth <= 820) {
+    // 모바일: panel-left를 사이드바 안으로 이동
+    if (!sidebarBody.contains(panelLeft)) {
+      sidebarBody.appendChild(panelLeft);
+      panelLeft.style.display = 'flex';
+      panelLeft.style.width   = '100%';
+      panelLeft.style.height  = '100%';
+    }
+  } else {
+    // 데스크탑: panel-left를 app-body 안으로 복귀
+    const appBody = $('.app-body');
+    if (appBody && !appBody.contains(panelLeft)) {
+      appBody.insertBefore(panelLeft, appBody.firstChild);
+      panelLeft.style.display = '';
+      panelLeft.style.width   = '';
+      panelLeft.style.height  = '';
+    }
+  }
+}
+
 function openSidebar() {
+  initSidebar(); // 열기 전 panel-left 위치 확인
   $('#m-sidebar')?.classList.add('open');
   $('#m-sidebar-overlay')?.classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -4060,6 +4076,9 @@ function closeSidebar() {
   $('#m-sidebar-overlay')?.classList.remove('open');
   document.body.style.overflow = '';
 }
+
+// 화면 크기 변경 시 panel-left 위치 재조정
+window.addEventListener('resize', initSidebar);
 $('#btn-sidebar-open')?.addEventListener('click', openSidebar);
 $('#btn-sidebar-close')?.addEventListener('click', closeSidebar);
 $('#m-sidebar-overlay')?.addEventListener('click', closeSidebar);

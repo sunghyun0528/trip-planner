@@ -157,7 +157,12 @@
   .panel-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); letter-spacing: -0.005em; }
   .panel-count { font-size: 11px; color: var(--mute-2); font-weight: 600; background: var(--line); padding: 2px 8px; border-radius: 999px; }
   .panel-content { flex: 1; overflow-y: auto; }
-  .panel-rec { flex-shrink: 0; }
+  /* 패널 탭 */
+  .panel-tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; background: var(--surface); }
+  .panel-tab { flex: 1; padding: 11px 8px; font-size: 12.5px; font-weight: 600; color: var(--mute); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; }
+  .panel-tab:hover { color: var(--ink); background: var(--bg); }
+  .panel-tab.active { color: var(--coral); border-bottom-color: var(--coral); }
+  .panel-pane { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
   .rec-item { display: flex; align-items: flex-start; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); transition: background .1s; }
   .rec-item:hover { background: var(--bg); }
   .rec-num { font-size: 10px; font-weight: 700; color: var(--mute-2); width: 16px; flex-shrink: 0; margin-top: 3px; }
@@ -906,44 +911,52 @@
 
   <div class="app-body">
     <aside class="panel panel-left" id="panel-left">
-      <div class="search-wrap">
-        <div class="search-help">가고 싶은 곳을 검색하면 바로 저장돼요 🔍</div>
-        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;">
-          <a href="https://www.google.com/maps" target="_blank" rel="noopener"
-             style="font-size:11.5px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:5px;padding:3px 0;text-decoration:none;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            구글맵 바로가기
-          </a>
-        </div>
-        <!-- API 사용량 경고 배너 -->
-        <div class="api-warning" id="api-warning">
-          <span>⚠️</span><span id="api-warning-text">오늘 API 한도에 근접했어요</span>
-        </div>
-        <div class="search-box">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input type="text" class="search-input" id="paste-input" placeholder="카오산 로드, 왓포 사원..." autocomplete="off" />
-          <div class="places-dropdown" id="places-dropdown"></div>
-        </div>
-        <div class="manual-add" id="btn-manual-add">✍️ 일단 이름만 적고 나중에 생각하기</div>
-      </div>
-      <div class="panel-content">
-        <div class="panel-header">
-          <span class="panel-title">📍 가보고싶은 곳</span>
-          <span class="panel-count" id="saved-count">0</span>
-        </div>
-        <div id="saved-list"></div>
+
+      <!-- 탭 메뉴 -->
+      <div class="panel-tabs">
+        <button class="panel-tab active" id="tab-search" onclick="switchPanelTab('search')">📍 장소 선택</button>
+        <button class="panel-tab" id="tab-rec" onclick="switchPanelTab('rec')">⭐ 추천 장소</button>
       </div>
 
-      <!-- 추천 장소 섹션 — places_db 기반, 스크래핑 추가 시 자동반영 -->
-      <div class="panel-rec" id="panel-rec">
-        <div class="panel-header" style="border-top:1px solid var(--line);">
-          <span class="panel-title">⭐ 추천 장소</span>
-          <div style="display:flex;gap:4px;align-items:center;">
-            <select id="rec-sort" onchange="loadRec()" style="font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);">
-              <option value="rating">별점순</option>
-              <option value="review">리뷰순</option>
+      <!-- 탭 1: 장소 선택 -->
+      <div class="panel-pane" id="pane-search">
+        <div class="search-wrap">
+          <div class="search-help">가고 싶은 곳을 검색하면 바로 저장돼요 🔍</div>
+          <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;">
+            <a href="https://www.google.com/maps" target="_blank" rel="noopener"
+               style="font-size:11.5px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:5px;padding:3px 0;text-decoration:none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              구글맵 바로가기
+            </a>
+          </div>
+          <div class="api-warning" id="api-warning">
+            <span>⚠️</span><span id="api-warning-text">오늘 API 한도에 근접했어요</span>
+          </div>
+          <div class="search-box">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" class="search-input" id="paste-input" placeholder="카오산 로드, 왓포 사원..." autocomplete="off" />
+            <div class="places-dropdown" id="places-dropdown"></div>
+          </div>
+          <div class="manual-add" id="btn-manual-add">✍️ 일단 이름만 적고 나중에 생각하기</div>
+        </div>
+        <div class="panel-content">
+          <div class="panel-header">
+            <span class="panel-title">📍 가보고싶은 곳</span>
+            <span class="panel-count" id="saved-count">0</span>
+          </div>
+          <div id="saved-list"></div>
+        </div>
+      </div>
+
+      <!-- 탭 2: 추천 장소 -->
+      <div class="panel-pane" id="pane-rec" style="display:none;">
+        <div class="panel-header" style="position:sticky;top:0;background:var(--surface);z-index:2;">
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+            <select id="rec-sort" onchange="loadRec()" style="font-size:11px;padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);">
+              <option value="rating">⭐ 별점순</option>
+              <option value="review">💬 리뷰순</option>
             </select>
-            <select id="rec-cat" onchange="loadRec()" style="font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);">
+            <select id="rec-cat" onchange="loadRec()" style="font-size:11px;padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);">
               <option value="">전체</option>
               <option value="맛집">🍽 맛집</option>
               <option value="카페">☕ 카페</option>
@@ -955,8 +968,9 @@
             </select>
           </div>
         </div>
-        <div id="rec-list" style="padding:4px 0;"></div>
+        <div id="rec-list"></div>
       </div>
+
     </aside>
 
     <main class="panel-center">
@@ -2722,6 +2736,15 @@ async function toggleLike(placeId) {
 function googleMapsLink(p) {
   if (p.lat != null && p.lng != null) return `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
+}
+
+function switchPanelTab(tab) {
+  const isSearch = tab === 'search';
+  $('#pane-search').style.display = isSearch ? 'flex' : 'none';
+  $('#pane-rec').style.display    = isSearch ? 'none' : 'flex';
+  $('#tab-search').classList.toggle('active', isSearch);
+  $('#tab-rec').classList.toggle('active', !isSearch);
+  if (!isSearch) loadRec(); // 추천 탭 전환 시 로드
 }
 
 /* ── 추천 장소 — places_db 기반, 스크래핑 추가 시 자동반영 ── */

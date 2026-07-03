@@ -2386,18 +2386,27 @@ $('#btn-save-trip-edit').onclick = async () => {
 };
 
 /* ============== TRIPS LIST ============== */
+let cityImgCache = null; // city images 메모리 캐시 — 앱 실행 중 한 번만 fetch
+
 async function loadTrips() {
   const uid = await currentUid();
   if (!uid) return;
 
-  // 도시 이미지 + 내 여행 목록 병렬 로딩
+  // city images는 캐시된 값 있으면 재사용 (매번 API 호출 방지)
+  const cityImagesPromise = cityImgCache
+    ? Promise.resolve(cityImgCache)
+    : fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []);
+
   const [memberRes, imgRes] = await Promise.all([
     sb.from('trip_members')
       .select('trip_id, trips(*)')
       .eq('user_id', uid)
       .order('created_at', { ascending: false, referencedTable: 'trips' }),
-    fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []),
+    cityImagesPromise,
   ]);
+
+  // 캐시 저장
+  if (!cityImgCache) cityImgCache = imgRes;
 
   // 도시명 → {url, position} 맵 생성
   const cityImgMap = {};

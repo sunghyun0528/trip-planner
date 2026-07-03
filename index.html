@@ -157,6 +157,16 @@
   .panel-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); letter-spacing: -0.005em; }
   .panel-count { font-size: 11px; color: var(--mute-2); font-weight: 600; background: var(--line); padding: 2px 8px; border-radius: 999px; }
   .panel-content { flex: 1; overflow-y: auto; }
+  .panel-rec { flex-shrink: 0; }
+  .rec-item { display: flex; align-items: flex-start; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); transition: background .1s; }
+  .rec-item:hover { background: var(--bg); }
+  .rec-num { font-size: 10px; font-weight: 700; color: var(--mute-2); width: 16px; flex-shrink: 0; margin-top: 3px; }
+  .rec-info { flex: 1; min-width: 0; }
+  .rec-name { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec-meta { font-size: 11px; color: var(--mute); margin-top: 2px; }
+  .rec-add { flex-shrink: 0; padding: 3px 8px; font-size: 11px; font-weight: 700; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); color: var(--mute); transition: all .15s; }
+  .rec-add:hover { background: var(--coral); border-color: var(--coral); color: #fff; }
+  .rec-empty { padding: 18px 14px; font-size: 12.5px; color: var(--mute); line-height: 1.7; }
 
   /* 검색 */
   .search-wrap { padding: 14px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 2; }
@@ -922,6 +932,30 @@
           <span class="panel-count" id="saved-count">0</span>
         </div>
         <div id="saved-list"></div>
+      </div>
+
+      <!-- 추천 장소 섹션 — places_db 기반, 스크래핑 추가 시 자동반영 -->
+      <div class="panel-rec" id="panel-rec">
+        <div class="panel-header" style="border-top:1px solid var(--line);">
+          <span class="panel-title">⭐ 추천 장소</span>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <select id="rec-sort" onchange="loadRec()" style="font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);">
+              <option value="rating">별점순</option>
+              <option value="review">리뷰순</option>
+            </select>
+            <select id="rec-cat" onchange="loadRec()" style="font-size:11px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);">
+              <option value="">전체</option>
+              <option value="맛집">🍽 맛집</option>
+              <option value="카페">☕ 카페</option>
+              <option value="관광">📍 관광지</option>
+              <option value="사원">🛕 사원</option>
+              <option value="스파">💆 스파</option>
+              <option value="쇼핑">🛍 쇼핑</option>
+              <option value="해변">🏖 해변</option>
+            </select>
+          </div>
+        </div>
+        <div id="rec-list" style="padding:4px 0;"></div>
       </div>
     </aside>
 
@@ -2531,6 +2565,7 @@ async function openTrip(tripId) {
   renderDashboard();
   renderSaved();
   renderItinerary();
+  loadRec(); // 추천 장소 (비동기, 나머지와 독립)
   renderChecklists();
   renderLinks();
   renderExpenses();
@@ -2687,6 +2722,94 @@ async function toggleLike(placeId) {
 function googleMapsLink(p) {
   if (p.lat != null && p.lng != null) return `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
+}
+
+/* ── 추천 장소 — places_db 기반, 스크래핑 추가 시 자동반영 ── */
+async function loadRec() {
+  const list  = $('#rec-list');
+  const city  = (currentTrip?.destinations || [])[0] || null;
+  const sort  = $('#rec-sort')?.value || 'rating';
+  const cat   = $('#rec-cat')?.value  || '';
+  if (!list) return;
+
+  // 여행지 미설정 시
+  if (!city) {
+    list.innerHTML = `<div class="rec-empty">여행지를 설정하면<br>추천 장소를 볼 수 있어요 🗺</div>`;
+    return;
+  }
+
+  list.innerHTML = `<div class="rec-empty" style="color:var(--mute-2);">불러오는 중...</div>`;
+
+  // places_db에서 현재 여행지 장소 조회
+  let q = sb.from('places_db')
+    .select('id,name,category,google_rating,review_count,address,lat,lng,photo_url,google_place_id')
+    .eq('city', city)
+    .not('google_rating', 'is', null)
+    .limit(15);
+
+  // 업종 필터 (category에 keyword 포함)
+  if (cat) q = q.ilike('category', `%${cat}%`);
+
+  // 정렬
+  if (sort === 'rating') q = q.order('google_rating', { ascending: false }).order('review_count', { ascending: false });
+  else q = q.order('review_count', { ascending: false }).order('google_rating', { ascending: false });
+
+  const { data, error } = await q;
+
+  if (error) { list.innerHTML = `<div class="rec-empty">불러오기 실패 😢</div>`; return; }
+
+  // DB에 해당 도시 데이터 없을 때 안내
+  if (!data || data.length === 0) {
+    const catLabel = cat || '장소';
+    list.innerHTML = `<div class="rec-empty">
+      <strong>${esc(city)}</strong>의 ${catLabel} 데이터가 아직 없어요.<br>
+      스크래퍼에서 <strong>${esc(city)}</strong> 데이터를 수집하면<br>
+      여기에 자동으로 반영됩니다 🔧
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = data.map((p, i) => {
+    const rating  = p.google_rating ? `⭐ ${p.google_rating}` : '';
+    const reviews = p.review_count  ? `· ${Number(p.review_count).toLocaleString()}리뷰` : '';
+    const cat     = p.category?.split(' ').slice(0, 2).join(' ') || '';
+    return `
+      <div class="rec-item">
+        <div class="rec-num">${i + 1}</div>
+        <div class="rec-info">
+          <div class="rec-name">${esc(p.name)}</div>
+          <div class="rec-meta">${esc(cat)} ${rating} ${reviews}</div>
+        </div>
+        <button class="rec-add" data-rec-id="${p.id}" data-rec-name="${esc(p.name)}"
+          data-lat="${p.lat || ''}" data-lng="${p.lng || ''}"
+          data-address="${esc(p.address || '')}"
+          data-rating="${p.google_rating || ''}"
+          data-photo="${esc(p.photo_url || '')}"
+          data-pid="${esc(p.google_place_id || '')}"
+          data-cat="${esc(p.category || '')}">+ 담기</button>
+      </div>`;
+  }).join('');
+
+  // 담기 버튼 핸들러
+  list.querySelectorAll('[data-rec-id]').forEach(btn => {
+    btn.onclick = async () => {
+      btn.textContent = '저장중...';
+      btn.disabled = true;
+      await savePlace({
+        name: btn.dataset.recName,
+        address: btn.dataset.address || null,
+        lat: parseFloat(btn.dataset.lat) || null,
+        lng: parseFloat(btn.dataset.lng) || null,
+        google_place_id: btn.dataset.pid || null,
+        google_rating: parseFloat(btn.dataset.rating) || null,
+        category: btn.dataset.cat || null,
+        photo_url: btn.dataset.photo || null,
+      });
+      btn.textContent = '✓ 담김';
+      btn.style.color = '#2e7d32';
+      btn.style.borderColor = '#2e7d32';
+    };
+  });
 }
 
 function renderSaved() {

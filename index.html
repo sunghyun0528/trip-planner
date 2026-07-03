@@ -2218,8 +2218,8 @@ async function toggleTip(placeId, btn) {
     return;
   }
 
-  // 이미 내용 있으면 그냥 펼치기 (재조회 안 함)
-  if (section.innerHTML.trim()) {
+  // 이미 내용 있으면 그냥 펼치기 (재조회 안 함) — 단, 오류 상태면 재시도
+  if (section.innerHTML.trim() && !section.innerHTML.includes('다시') && !section.innerHTML.includes('😢') && !section.innerHTML.includes('😅')) {
     section.classList.add('open');
     btn.textContent = '✦ 접기';
     return;
@@ -2257,8 +2257,13 @@ async function toggleTip(placeId, btn) {
     renderTipSection(section, data);
     btn.textContent = '✦ 접기';
   } catch(e) {
-    section.innerHTML = `<div style="padding:8px 0;font-size:12px;color:#aaa;">꿀팁을 불러오지 못했어요 😢</div>`;
-    btn.textContent = '✦ 꿀팁';
+    const msg = e.message.includes('503') || e.message.includes('UNAVAILABLE')
+              ? '지금 Gemini 서버가 바빠요 😅 잠시 후 다시 눌러봐요'
+              : e.message.includes('429') || e.message.includes('RESOURCE_EXHAUSTED')
+              ? '오늘 꿀팁 한도를 초과했어요 😅'
+              : '꿀팁을 불러오지 못했어요 😢';
+    section.innerHTML = `<div style="padding:8px 0;font-size:12px;color:#aaa;">${msg}</div>`;
+    btn.textContent = '✦ 다시 시도';
     console.error('[꿀팁]', e.message);
   }
   btn.classList.remove('loading');

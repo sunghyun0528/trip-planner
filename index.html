@@ -895,6 +895,7 @@
     </div>
     <div class="h-right">
       <div class="member-stack" id="member-stack"></div>
+      <button class="btn btn-accent btn-sm" id="btn-board" onclick="goBoard()">🧠 브레인스토밍</button>
       <button class="btn btn-secondary btn-sm" id="btn-map-toggle">🗺 지도</button>
       <button class="btn btn-secondary btn-sm" id="btn-invite">초대</button>
     </div>
@@ -2209,12 +2210,19 @@ async function bootstrap() {
 
 async function handleSignedIn(u) {
   user = u;
+  // board.html에서 "일정으로" 돌아온 경우 — trip 파라미터로 해당 여행 열기
+  const tripParam = new URLSearchParams(location.search).get('trip');
   if (location.hash || location.search.includes('access_token') || location.search.includes('code=')) {
     history.replaceState({}, '', location.pathname);
   }
   await processPendingInvite();
   await loadTrips();
-  showScreen('screen-trips');
+  if (tripParam) {
+    history.replaceState({}, '', location.pathname);
+    await openTrip(tripParam);
+  } else {
+    showScreen('screen-trips');
+  }
 }
 
 async function processPendingInvite() {
@@ -2739,6 +2747,10 @@ async function toggleLike(placeId) {
 function googleMapsLink(p) {
   if (p.lat != null && p.lng != null) return `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
+}
+
+function goBoard() {
+  if (currentTrip) location.href = `/board.html?trip=${currentTrip.id}`;
 }
 
 function switchPanelTab(tab) {

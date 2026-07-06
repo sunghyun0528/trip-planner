@@ -2208,6 +2208,9 @@ async function bootstrap() {
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
 
+  // [임시 디버그] 화면에 직접 표시 — 콘솔 못 보는 환경(모바일)에서도 확인 가능
+  toast(`🔍 부트스트랩: trip파라미터=${pendingTripParam || '없음'}`, 4000);
+
   history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
   // 화면 판단은 onAuthStateChange의 INITIAL_SESSION에 전적으로 맡김
   // 여기서 직접 showScreen하지 않음 — 0.1초 안에 INITIAL_SESSION 이벤트가 발생함
@@ -2219,10 +2222,15 @@ async function handleSignedIn(u) {
   if (location.hash) history.replaceState({}, '', location.pathname);
   await processPendingInvite();
   await loadTrips();
+
+  // [임시 디버그]
+  toast(`🔍 handleSignedIn: pendingTripParam=${pendingTripParam || '없음'}`, 4000);
+
   if (pendingTripParam) {
     const tripToOpen = pendingTripParam;
     pendingTripParam = null; // 한 번만 사용
     await sb.auth.getSession(); // 세션이 완전히 동기화된 후 쿼리하도록 보장
+    toast(`🔍 openTrip 호출: ${tripToOpen}`, 4000);
     await openTrip(tripToOpen);
   } else {
     showScreen('screen-trips');
@@ -2577,10 +2585,11 @@ async function openTrip(tripId) {
   const { data: trip, error } = await sb.from('trips').select('*').eq('id', tripId).single();
   if (error || !trip) {
     console.error('[openTrip 실패]', error?.message || '여행 없음', tripId);
-    toast('여행을 불러올 수 없어요');
+    toast(`❌ openTrip 실패: ${error?.message || '여행 없음'}`, 5000);
     showScreen('screen-trips'); // 절대 로그인 화면(기본 활성 화면)에 머물지 않게 함
     return;
   }
+  toast(`✅ openTrip 성공: ${trip.name}`, 3000);
   currentTrip = trip;
   $('#current-name').textContent = trip.name;
   $('#current-meta-text').textContent = fmtDateRange(trip.start_date, trip.end_date);

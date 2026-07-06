@@ -167,8 +167,14 @@ function getTripId() {
   return new URLSearchParams(location.search).get('trip');
 }
 
-function goBack() { location.href = `/index.html?trip=${tripId}`; }
-function goItinerary() { location.href = `/index.html?trip=${tripId}`; }
+function goBack() {
+  sessionStorage.setItem('mongsil_open_trip', tripId); // URL 대신 sessionStorage로 전달 (URL이 중간에 지워지는 문제 회피)
+  location.href = '/index.html';
+}
+function goItinerary() {
+  sessionStorage.setItem('mongsil_open_trip', tripId);
+  location.href = '/index.html';
+}
 
 // 무드 선택
 $('#mood-pick').addEventListener('click', (e) => {

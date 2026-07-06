@@ -4278,8 +4278,20 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { $$('.modal
    스크립트 파싱 완료 후 호출됨 → 함수 정의 문제 없음 ── */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'INITIAL_SESSION') {
-    if (session && !user) await handleSignedIn(session.user);
-    else if (!session && !user) showScreen('screen-auth', false);
+    if (session && !user) {
+      await handleSignedIn(session.user);
+    } else if (!session && !user) {
+      // INITIAL_SESSION이 null로 온 경우 — 레이스 컨디션 대비 한번 더 명시적으로 재확인
+      toast('🔍 INITIAL_SESSION이 null — 재확인 중...', 4000);
+      const { data: { session: retrySession } } = await sb.auth.getSession();
+      if (retrySession) {
+        toast('✅ 재확인으로 세션 찾음', 3000);
+        await handleSignedIn(retrySession.user);
+      } else {
+        toast('❌ 재확인해도 세션 없음 — 로그인 필요', 4000);
+        showScreen('screen-auth', false);
+      }
+    }
     return;
   }
   if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !user) {

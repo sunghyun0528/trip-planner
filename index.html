@@ -2200,26 +2200,29 @@ function renderWeatherCard() {
     </div>
   </div>`;
 }
+let pendingTripParam = null; // bootstrap 실행 전에 미리 저장 (replaceState로 URL 지워지기 전)
+
 async function bootstrap() {
-  history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
+  // URL 파라미터를 먼저 읽어서 저장 — replaceState로 지워지기 전에 캡처
+  pendingTripParam = new URLSearchParams(location.search).get('trip');
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
+
+  history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
   // 화면 판단은 onAuthStateChange의 INITIAL_SESSION에 전적으로 맡김
   // 여기서 직접 showScreen하지 않음 — 0.1초 안에 INITIAL_SESSION 이벤트가 발생함
 }
 
 async function handleSignedIn(u) {
   user = u;
-  // board.html에서 "일정으로" 돌아온 경우 — trip 파라미터로 해당 여행 열기
-  const tripParam = new URLSearchParams(location.search).get('trip');
-  if (location.hash || location.search.includes('access_token') || location.search.includes('code=')) {
-    history.replaceState({}, '', location.pathname);
-  }
+  // OAuth 리다이렉트 해시(#access_token 등) 정리 — trip 파라미터는 이미 pendingTripParam에 저장됨
+  if (location.hash) history.replaceState({}, '', location.pathname);
   await processPendingInvite();
   await loadTrips();
-  if (tripParam) {
-    history.replaceState({}, '', location.pathname);
-    await openTrip(tripParam);
+  if (pendingTripParam) {
+    const tripToOpen = pendingTripParam;
+    pendingTripParam = null; // 한 번만 사용
+    await openTrip(tripToOpen);
   } else {
     showScreen('screen-trips');
   }

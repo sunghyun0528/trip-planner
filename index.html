@@ -839,6 +839,18 @@
 </style>
 </head>
 <body>
+<!-- [임시 디버그 패널] 화면 최상단에 로그 누적 표시 — 콘솔 못 보는 환경 대응 -->
+<div id="debug-log" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font-family:monospace;font-size:10px;padding:6px;max-height:35vh;overflow-y:auto;line-height:1.5;"></div>
+<script>
+  function dbg(msg) {
+    const el = document.getElementById('debug-log');
+    if (!el) return;
+    const line = document.createElement('div');
+    line.textContent = `[${new Date().toTimeString().slice(0,8)}] ${msg}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+</script>
 
 <!-- AUTH -->
 <div id="screen-auth" class="screen active">
@@ -2208,29 +2220,31 @@ async function bootstrap() {
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
 
-  // [임시 디버그] 화면에 직접 표시 — 콘솔 못 보는 환경(모바일)에서도 확인 가능
-  toast(`🔍 부트스트랩: trip파라미터=${pendingTripParam || '없음'}`, 4000);
+  // [임시 디버그] 화면 상단에 누적 로그
+  dbg(`bootstrap 시작: trip파라미터=${pendingTripParam || '없음'}`);
+  const rawSession = localStorage.getItem('sb-izmlenodqnvisymjnlyg-auth-token');
+  dbg(`localStorage 세션: ${rawSession ? '있음(' + rawSession.length + '자)' : '❌없음'}`);
 
   history.replaceState({ screen: 'screen-auth' }, '', location.pathname);
+  dbg('replaceState 완료, INITIAL_SESSION 대기중...');
   // 화면 판단은 onAuthStateChange의 INITIAL_SESSION에 전적으로 맡김
   // 여기서 직접 showScreen하지 않음 — 0.1초 안에 INITIAL_SESSION 이벤트가 발생함
 }
 
 async function handleSignedIn(u) {
   user = u;
+  dbg(`handleSignedIn 진입: user=${u?.email}`);
   // OAuth 리다이렉트 해시(#access_token 등) 정리 — trip 파라미터는 이미 pendingTripParam에 저장됨
   if (location.hash) history.replaceState({}, '', location.pathname);
   await processPendingInvite();
   await loadTrips();
-
-  // [임시 디버그]
-  toast(`🔍 handleSignedIn: pendingTripParam=${pendingTripParam || '없음'}`, 4000);
+  dbg(`loadTrips 완료. pendingTripParam=${pendingTripParam || '없음'}`);
 
   if (pendingTripParam) {
     const tripToOpen = pendingTripParam;
     pendingTripParam = null; // 한 번만 사용
     await sb.auth.getSession(); // 세션이 완전히 동기화된 후 쿼리하도록 보장
-    toast(`🔍 openTrip 호출: ${tripToOpen}`, 4000);
+    dbg(`openTrip 호출: ${tripToOpen}`);
     await openTrip(tripToOpen);
   } else {
     showScreen('screen-trips');
@@ -2582,14 +2596,16 @@ $('#btn-do-join').onclick = async () => {
 
 /* ============== OPEN TRIP ============== */
 async function openTrip(tripId) {
+  dbg(`openTrip 시작: tripId=${tripId}`);
   const { data: trip, error } = await sb.from('trips').select('*').eq('id', tripId).single();
   if (error || !trip) {
     console.error('[openTrip 실패]', error?.message || '여행 없음', tripId);
-    toast(`❌ openTrip 실패: ${error?.message || '여행 없음'}`, 5000);
+    dbg(`❌ openTrip 실패: ${error?.message || '여행 없음'} (code: ${error?.code || '?'})`);
+    toast('여행을 불러올 수 없어요');
     showScreen('screen-trips'); // 절대 로그인 화면(기본 활성 화면)에 머물지 않게 함
     return;
   }
-  toast(`✅ openTrip 성공: ${trip.name}`, 3000);
+  dbg(`✅ openTrip 성공: ${trip.name}`);
   currentTrip = trip;
   $('#current-name').textContent = trip.name;
   $('#current-meta-text').textContent = fmtDateRange(trip.start_date, trip.end_date);
@@ -4277,18 +4293,19 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { $$('.modal
    INITIAL_SESSION 이벤트는 콜백이 비동기로 실행되므로
    스크립트 파싱 완료 후 호출됨 → 함수 정의 문제 없음 ── */
 sb.auth.onAuthStateChange(async (event, session) => {
+  dbg(`onAuthStateChange 이벤트: ${event}, session=${session ? 'O' : 'X'}`);
   if (event === 'INITIAL_SESSION') {
     if (session && !user) {
       await handleSignedIn(session.user);
     } else if (!session && !user) {
-      // INITIAL_SESSION이 null로 온 경우 — 레이스 컨디션 대비 한번 더 명시적으로 재확인
-      toast('🔍 INITIAL_SESSION이 null — 재확인 중...', 4000);
-      const { data: { session: retrySession } } = await sb.auth.getSession();
+      dbg('INITIAL_SESSION이 null — getSession()으로 재확인 중...');
+      const { data: { session: retrySession }, error: retryErr } = await sb.auth.getSession();
+      if (retryErr) dbg(`getSession 에러: ${retryErr.message}`);
       if (retrySession) {
-        toast('✅ 재확인으로 세션 찾음', 3000);
+        dbg('✅ 재확인으로 세션 찾음 — handleSignedIn 호출');
         await handleSignedIn(retrySession.user);
       } else {
-        toast('❌ 재확인해도 세션 없음 — 로그인 필요', 4000);
+        dbg('❌ 재확인해도 세션 없음 — 진짜 로그인 필요한 상태');
         showScreen('screen-auth', false);
       }
     }

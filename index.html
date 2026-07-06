@@ -1980,13 +1980,24 @@ function avatarColor(id) {
   return colors[h % colors.length];
 }
 const POSTIT_COLORS = 12; // 총 색상 수
+// 지정 시간 안에 응답 없으면 강제로 포기 — 특정 상황에서 Supabase 요청이
+// 무한 대기하는 현상에 대한 안전장치 (원인 규명 전까지 임시 방어)
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`TIMEOUT(${label})`)), ms)),
+  ]);
+}
+
 async function currentUid() {
   // 이미 로그인된 user 정보가 있으면 getSession() 재호출 안 함
-  // (board.html 등 다른 페이지에서 넘어올 때 getSession()이 Supabase 내부 락 문제로
-  //  무한 대기하는 현상 발견 — 이미 확보된 user 정보를 우선 사용해서 회피)
   if (user?.id) return user.id;
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) { user = session.user; return session.user.id; }
+  try {
+    const { data: { session } } = await withTimeout(sb.auth.getSession(), 5000, 'getSession');
+    if (session?.user) { user = session.user; return session.user.id; }
+  } catch (e) {
+    dbg(`currentUid getSession 타임아웃: ${e.message}`);
+  }
   return null;
 }
 
@@ -2492,7 +2503,9 @@ $('#btn-save-trip-edit').onclick = async () => {
 let cityImgCache = null; // city images 메모리 캐시
 
 async function loadTrips() {
+  dbg('loadTrips 진입');
   const uid = await currentUid();
+  dbg(`currentUid 완료: ${uid}`);
   if (!uid) return;
 
   // city images — localStorage 캐시 우선 (새로고침해도 재호출 안 함)
@@ -2504,17 +2517,36 @@ async function loadTrips() {
     if (cached && cachedAt && Date.now() - Number(cachedAt) < ONE_DAY) {
       cityImgCache = JSON.parse(cached);
     } else {
-      const fresh = await fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []);
+      dbg('city-images fetch 시작');
+      const fresh = await withTimeout(
+        fetch('/api/city-images').then(r => r.ok ? r.json() : []).catch(() => []),
+        5000, 'city-images'
+      ).catch(e => { dbg(`city-images 타임아웃/실패: ${e.message}`); return []; });
       cityImgCache = fresh;
       localStorage.setItem('cityImgCache', JSON.stringify(fresh));
       localStorage.setItem('cityImgCacheAt', Date.now());
+      dbg('city-images fetch 완료');
     }
   }
 
-  const memberRes = await sb.from('trip_members')
-    .select('trip_id, trips(*)')
-    .eq('user_id', uid)
-    .order('created_at', { ascending: false, referencedTable: 'trips' });
+  dbg('trip_members 쿼리 시작');
+  let memberRes;
+  try {
+    memberRes = await withTimeout(
+      sb.from('trip_members')
+        .select('trip_id, trips(*)')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false, referencedTable: 'trips' }),
+      6000, 'trip_members'
+    );
+    dbg('trip_members 쿼리 완료');
+  } catch (e) {
+    dbg(`❌ trip_members 쿼리 타임아웃/실패: ${e.message}`);
+    // 강제로 페이지 새로고침 — 멈춘 Supabase 내부 상태를 완전히 리셋
+    dbg('3초 후 자동 새로고침합니다...');
+    setTimeout(() => location.reload(), 3000);
+    return;
+  }
 
   const imgRes = cityImgCache;
 

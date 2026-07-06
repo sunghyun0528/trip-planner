@@ -2220,13 +2220,22 @@ function renderWeatherCard() {
 let pendingTripParam = null; // bootstrap 실행 전에 미리 저장 (replaceState로 URL 지워지기 전)
 
 async function bootstrap() {
-  // URL 파라미터를 먼저 읽어서 저장 — replaceState로 지워지기 전에 캡처
-  pendingTripParam = new URLSearchParams(location.search).get('trip');
+  // sessionStorage 우선 확인 (board.html에서 넘어온 경우) — URL보다 안전함
+  // Supabase createClient()의 내부 URL 세션 감지 로직이 쿼리스트링을 건드릴 수 있어서
+  // URL 파라미터 대신 sessionStorage를 1순위로 사용
+  const fromSession = sessionStorage.getItem('mongsil_open_trip');
+  if (fromSession) {
+    sessionStorage.removeItem('mongsil_open_trip'); // 한 번만 사용
+    pendingTripParam = fromSession;
+  } else {
+    // 폴백 — URL 파라미터 (직접 링크 공유 등의 경우)
+    pendingTripParam = new URLSearchParams(location.search).get('trip');
+  }
   const code = new URLSearchParams(location.search).get('join');
   if (code) localStorage.setItem('pending_join', code);
 
   // [임시 디버그] 화면 상단에 누적 로그
-  dbg(`bootstrap 시작: trip파라미터=${pendingTripParam || '없음'}`);
+  dbg(`bootstrap 시작: trip파라미터=${pendingTripParam || '없음'} (출처: ${fromSession ? 'sessionStorage' : 'URL'})`);
   const rawSession = localStorage.getItem('sb-izmlenodqnvisymjnlyg-auth-token');
   dbg(`localStorage 세션: ${rawSession ? '있음(' + rawSession.length + '자)' : '❌없음'}`);
 

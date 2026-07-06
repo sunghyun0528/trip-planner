@@ -2222,6 +2222,7 @@ async function handleSignedIn(u) {
   if (pendingTripParam) {
     const tripToOpen = pendingTripParam;
     pendingTripParam = null; // 한 번만 사용
+    await sb.auth.getSession(); // 세션이 완전히 동기화된 후 쿼리하도록 보장
     await openTrip(tripToOpen);
   } else {
     showScreen('screen-trips');
@@ -2574,7 +2575,12 @@ $('#btn-do-join').onclick = async () => {
 /* ============== OPEN TRIP ============== */
 async function openTrip(tripId) {
   const { data: trip, error } = await sb.from('trips').select('*').eq('id', tripId).single();
-  if (error || !trip) { toast('여행을 불러올 수 없어요'); return; }
+  if (error || !trip) {
+    console.error('[openTrip 실패]', error?.message || '여행 없음', tripId);
+    toast('여행을 불러올 수 없어요');
+    showScreen('screen-trips'); // 절대 로그인 화면(기본 활성 화면)에 머물지 않게 함
+    return;
+  }
   currentTrip = trip;
   $('#current-name').textContent = trip.name;
   $('#current-meta-text').textContent = fmtDateRange(trip.start_date, trip.end_date);

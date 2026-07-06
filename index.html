@@ -1981,6 +1981,10 @@ function avatarColor(id) {
 }
 const POSTIT_COLORS = 12; // 총 색상 수
 async function currentUid() {
+  // 이미 로그인된 user 정보가 있으면 getSession() 재호출 안 함
+  // (board.html 등 다른 페이지에서 넘어올 때 getSession()이 Supabase 내부 락 문제로
+  //  무한 대기하는 현상 발견 — 이미 확보된 user 정보를 우선 사용해서 회피)
+  if (user?.id) return user.id;
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) { user = session.user; return session.user.id; }
   return null;
@@ -2263,7 +2267,6 @@ async function handleSignedIn(u) {
     if (pendingTripParam) {
       const tripToOpen = pendingTripParam;
       pendingTripParam = null; // 한 번만 사용
-      await sb.auth.getSession(); // 세션이 완전히 동기화된 후 쿼리하도록 보장
       dbg(`openTrip 호출: ${tripToOpen}`);
       await openTrip(tripToOpen);
     } else {

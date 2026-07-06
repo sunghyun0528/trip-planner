@@ -839,8 +839,13 @@
 </style>
 </head>
 <body>
-<!-- [임시 디버그 패널] 화면 최상단에 로그 누적 표시 — 콘솔 못 보는 환경 대응 -->
-<div id="debug-log" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font-family:monospace;font-size:10px;padding:6px;max-height:35vh;overflow-y:auto;line-height:1.5;"></div>
+<!-- [임시 디버그 패널] 우측 하단 작은 박스, 접었다 펼 수 있음 -->
+<div id="debug-wrap" style="position:fixed;bottom:8px;right:8px;z-index:99999;font-family:monospace;">
+  <button id="debug-toggle" onclick="document.getElementById('debug-log').classList.toggle('collapsed')"
+    style="background:#000;color:#0f0;border:none;border-radius:6px;padding:4px 8px;font-size:10px;cursor:pointer;margin-bottom:2px;">🐛 로그</button>
+  <div id="debug-log" style="background:#000;color:#0f0;font-size:9px;padding:6px;width:280px;max-height:200px;overflow-y:auto;line-height:1.5;border-radius:6px;opacity:0.92;"></div>
+</div>
+<style>#debug-log.collapsed { display: none; }</style>
 <script>
   function dbg(msg) {
     const el = document.getElementById('debug-log');
@@ -2234,19 +2239,33 @@ async function bootstrap() {
 async function handleSignedIn(u) {
   user = u;
   dbg(`handleSignedIn 진입: user=${u?.email}`);
-  // OAuth 리다이렉트 해시(#access_token 등) 정리 — trip 파라미터는 이미 pendingTripParam에 저장됨
-  if (location.hash) history.replaceState({}, '', location.pathname);
-  await processPendingInvite();
-  await loadTrips();
-  dbg(`loadTrips 완료. pendingTripParam=${pendingTripParam || '없음'}`);
+  try {
+    // OAuth 리다이렉트 해시(#access_token 등) 정리 — trip 파라미터는 이미 pendingTripParam에 저장됨
+    if (location.hash) history.replaceState({}, '', location.pathname);
 
-  if (pendingTripParam) {
-    const tripToOpen = pendingTripParam;
-    pendingTripParam = null; // 한 번만 사용
-    await sb.auth.getSession(); // 세션이 완전히 동기화된 후 쿼리하도록 보장
-    dbg(`openTrip 호출: ${tripToOpen}`);
-    await openTrip(tripToOpen);
-  } else {
+    dbg('processPendingInvite 호출 전');
+    await processPendingInvite();
+    dbg('processPendingInvite 완료');
+
+    dbg('loadTrips 호출 전');
+    await loadTrips();
+    dbg(`loadTrips 완료. pendingTripParam=${pendingTripParam || '없음'}`);
+
+    if (pendingTripParam) {
+      const tripToOpen = pendingTripParam;
+      pendingTripParam = null; // 한 번만 사용
+      await sb.auth.getSession(); // 세션이 완전히 동기화된 후 쿼리하도록 보장
+      dbg(`openTrip 호출: ${tripToOpen}`);
+      await openTrip(tripToOpen);
+    } else {
+      dbg('showScreen(screen-trips) 호출');
+      showScreen('screen-trips');
+    }
+  } catch (e) {
+    dbg(`❌❌❌ handleSignedIn 내부 에러: ${e.message}`);
+    dbg(`스택: ${(e.stack || '').slice(0, 200)}`);
+    console.error('[handleSignedIn 에러]', e);
+    // 에러 나도 최소한 여행 목록은 보여줌 (로그인 화면에 갇히지 않게)
     showScreen('screen-trips');
   }
 }

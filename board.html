@@ -168,13 +168,18 @@ function getTripId() {
 }
 
 function goBack() {
-  sessionStorage.setItem('mongsil_open_trip', tripId); // URL 대신 sessionStorage로 전달 (URL이 중간에 지워지는 문제 회피)
-  location.href = '/index.html';
-}
-function goItinerary() {
+  sb.removeAllChannels();
   sessionStorage.setItem('mongsil_open_trip', tripId);
   location.href = '/index.html';
 }
+function goItinerary() {
+  sb.removeAllChannels();
+  sessionStorage.setItem('mongsil_open_trip', tripId);
+  location.href = '/index.html';
+}
+
+// 브라우저 뒤로가기 등 어떤 방식으로 페이지를 떠나도 실시간 연결 정리
+window.addEventListener('beforeunload', () => { sb.removeAllChannels(); });
 
 // 무드 선택
 $('#mood-pick').addEventListener('click', (e) => {

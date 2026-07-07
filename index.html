@@ -2529,20 +2529,31 @@ async function loadTrips() {
     }
   }
 
-  dbg('trip_members 쿼리 시작');
-  let memberRes;
+  dbg('trip_members 쿼리 시작 (조인 없이 경량화)');
+  const _t0 = performance.now();
+  let trips = [];
   try {
-    memberRes = await withTimeout(
-      sb.from('trip_members')
-        .select('trip_id, trips(*)')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false, referencedTable: 'trips' }),
-      6000, 'trip_members'
+    // 1단계 — trip_members에서 내 trip_id 목록만 가볍게 조회 (조인 없음)
+    const { data: memberRows, error: memberErr } = await withTimeout(
+      sb.from('trip_members').select('trip_id').eq('user_id', uid),
+      8000, 'trip_members'
     );
-    dbg('trip_members 쿼리 완료');
+    if (memberErr) throw memberErr;
+    dbg(`1단계 완료 — ${Math.round(performance.now() - _t0)}ms, trip_id ${memberRows?.length || 0}개`);
+
+    const tripIds = (memberRows || []).map(r => r.trip_id);
+    if (tripIds.length) {
+      // 2단계 — 그 trip_id들로 trips 테이블 직접 조회 (IN 조건, RLS 단순함)
+      const { data: tripRows, error: tripErr } = await withTimeout(
+        sb.from('trips').select('*').in('id', tripIds).order('created_at', { ascending: false }),
+        8000, 'trips'
+      );
+      if (tripErr) throw tripErr;
+      trips = tripRows || [];
+      dbg(`2단계 완료 — 총 소요시간: ${Math.round(performance.now() - _t0)}ms`);
+    }
   } catch (e) {
-    dbg(`❌ trip_members 쿼리 타임아웃/실패: ${e.message}`);
-    // 강제로 페이지 새로고침 — 멈춘 Supabase 내부 상태를 완전히 리셋
+    dbg(`❌ 여행 목록 조회 실패 — 경과: ${Math.round(performance.now() - _t0)}ms, ${e.message}`);
     dbg('3초 후 자동 새로고침합니다...');
     setTimeout(() => location.reload(), 3000);
     return;
@@ -2557,8 +2568,6 @@ async function loadTrips() {
   });
 
   const list = $('#trips-list');
-  if (memberRes.error) { list.innerHTML = `<div class="empty">불러오기 오류: ${esc(memberRes.error.message)}</div>`; return; }
-  const trips = (memberRes.data || []).map(row => row.trips).filter(Boolean);
   if (!trips.length) { list.innerHTML = '<div class="empty">아직 여행이 없네요. 첫 여행을 만들어보세요 ✨</div>'; return; }
 
   list.innerHTML = trips.map(t => {

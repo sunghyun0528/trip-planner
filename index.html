@@ -2856,6 +2856,7 @@ function googleMapsLink(p) {
 }
 
 function goBoard() {
+  if (realtimeChannel) sb.removeAllChannels(); // 브레인스토밍으로 넘어가기 전 실시간 연결 정리
   if (currentTrip) location.href = `/board.html?trip=${currentTrip.id}`;
 }
 
